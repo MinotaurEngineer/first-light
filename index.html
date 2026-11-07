@@ -383,7 +383,7 @@ body {
   font-size: clamp(3rem, 8.5vw, 7rem); line-height: 0.88; letter-spacing: -0.055em;
 }
 .ms-meta { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 16px; align-items: end; }
-.ms-arrow { font-size: 1.1rem; color: var(--ink); }
+.ms-version { text-align: right; color: var(--ink); }
 
 /* statement */
 .ms-statement { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 32px; align-items: end; padding-block: 36px 8px; }
@@ -573,6 +573,12 @@ body.ms-running { overflow: hidden; }
   .ms-phase { border-right: none; border-bottom: 1px solid var(--line); }
 }
 
+/* ---- v1.1.0: band sits outside the content column, so nothing can exceed the viewport width ---- */
+.ms-homewrap { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; animation: ms-fade 250ms ease-out both; }
+.ms-homewrap > .ms-home { flex: 1 0 auto; min-height: 0; width: 100%; }
+.ms-homewrap > .ms-week { width: auto; margin: 0; }
+html, body { max-width: 100%; overflow-x: hidden; }
+
 </style>
 <div id="app"></div>
 <script>
@@ -666,7 +672,7 @@ window.Scout = (function () {
     todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   };
 
-  return { store, stats, util, modules: {}, version: 1 };
+  return { store, stats, util, modules: {}, version: 1, appVersion: '1.1.0' };
 })();
 
 ;
@@ -874,13 +880,22 @@ window.Scout = (function () {
     const extra = intensity === 'hold' ? 2 : intensity === 'ease' ? 4 : 0;
     return Math.min(maxFramesFor(frameMs), framesFor(startExposureMs, frameMs) + extra);
   }
+  /* A new stage restarts here: hard enough not to waste reps, easy enough to find the level again. */
+  const RESTART_MS = 150;
+  /* Reversals at the start are warm-up (settling in, learning the task) and don't count. */
+  const WARMUP_REVERSALS = 2;
+  /* This many correct reps in a row at the shortest possible flash clears the stage. */
+  const FLOOR_RUN = 6;
+
   function makeStaircase(startFrames, maxFrames) {
-    return { frames: startFrames, maxFrames, streak: 0, lastDir: 0, reversals: [] };
+    return { frames: startFrames, maxFrames, streak: 0, lastDir: 0, reversals: [], hist: [], floorRun: 0 };
   }
   /* Coarse steps far above threshold, single frames near it. */
   function stepSize(frames) { return frames > 8 ? 2 : 1; }
   /* 2-down / 1-up on frames. dir -1 = harder (shorter), +1 = easier. Mutates and returns s. */
   function stairUpdate(s, correct) {
+    s.hist.push(s.frames);
+    s.floorRun = (correct && s.frames === 1) ? s.floorRun + 1 : 0;
     let dir;
     if (correct) { s.streak++; if (s.streak < 2) return s; s.streak = 0; dir = -1; }
     else { s.streak = 0; dir = 1; }
@@ -889,14 +904,41 @@ window.Scout = (function () {
     s.frames = Math.max(1, Math.min(s.maxFrames, s.frames + dir * stepSize(s.frames)));
     return s;
   }
+  function settledReversals(s) { return s.reversals.slice(WARMUP_REVERSALS); }
+  /* Mean of the last 6 settled reversals. If too few (e.g. working at the floor without misses),
+     use the mean presented level over the last 8 reps; with no reps yet, the current level. */
   function thresholdFrames(s) {
-    if (!s.reversals.length) return s.frames;
-    const last = s.reversals.slice(-6);
-    return last.reduce((a, b) => a + b, 0) / last.length;
+    const rev = settledReversals(s);
+    if (rev.length >= 2) { const last = rev.slice(-6); return last.reduce((a, b) => a + b, 0) / last.length; }
+    if (s.hist.length) { const last = s.hist.slice(-8); return last.reduce((a, b) => a + b, 0) / last.length; }
+    return s.frames;
   }
-  function shouldAdvance(s, stage) { return stage < 3 && s.reversals.length >= 4 && thresholdFrames(s) <= 3; }
+  function shouldAdvance(s, stage) {
+    if (stage >= 3) return false;
+    if (s.floorRun >= FLOOR_RUN) return true;
+    return settledReversals(s).length >= 2 && thresholdFrames(s) <= 3;
+  }
+  /* Clearing by the floor rule means the threshold is the floor itself. */
+  function clearedMs(s, frameMs) { return Math.round((s.floorRun >= FLOOR_RUN ? 1 : thresholdFrames(s)) * frameMs * 10) / 10; }
+  /* Recompute a stored session's result from its saved reps with the current rules. */
+  function rescore(trials, frameMs) {
+    if (!trials || !trials.length) return null;
+    const max = maxFramesFor(frameMs);
+    let s = makeStaircase(trials[0].frames, max), stage = trials[0].stage, cleared = [], done = null;
+    for (const t of trials) {
+      if (t.stage === done) continue;              /* older sessions kept going after the point it should have cleared */
+      if (t.stage !== stage) { stage = t.stage; s = makeStaircase(t.frames, max); }
+      s.frames = t.frames;
+      stairUpdate(s, t.correct);
+      if (shouldAdvance(s, stage)) { cleared.push({ stage, thresholdMs: clearedMs(s, frameMs) }); done = stage; stage++; s = makeStaircase(framesFor(RESTART_MS, frameMs), max); }
+    }
+    const last = cleared[cleared.length - 1];
+    const scoredHere = s.hist.length >= 8 || !last;
+    return { cleared, stage, thresholdStage: scoredHere ? stage : last.stage,
+      thresholdMs: scoredHere ? Math.round(thresholdFrames(s) * frameMs * 10) / 10 : last.thresholdMs };
+  }
 
-  const logic = { ECC, DISTRACTORS, medianOf, maxFramesFor, framesFor, startFramesFor, makeStaircase, stepSize, stairUpdate, thresholdFrames, shouldAdvance };
+  const logic = { ECC, DISTRACTORS, RESTART_MS, WARMUP_REVERSALS, FLOOR_RUN, medianOf, maxFramesFor, framesFor, startFramesFor, makeStaircase, stepSize, stairUpdate, settledReversals, thresholdFrames, shouldAdvance, clearedMs, rescore };
 
   /* ---------- glyphs ---------- */
   const SVG_TRI = '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,12 92,86 8,86" fill="currentColor"/></svg>';
@@ -1151,13 +1193,15 @@ window.Scout = (function () {
     }
 
     /* ---- session ---- */
-    const trials = [];
+    const trials = [], clearedStages = [];
     let frameMs = 1000 / 60, stair = null, tStart = 0;
     const result = () => {
       const n = trials.length, nc = trials.filter(t => t.correct).length;
-      const thr = stair ? thresholdFrames(stair) * frameMs : NaN;
+      let thr = stair ? thresholdFrames(stair) * frameMs : NaN, thresholdStage = stage;
+      /* Just moved up with only a few reps at the new stage: report the stage that was cleared. */
+      if (clearedStages.length && stair && stair.hist.length < 8) { thr = clearedStages[clearedStages.length - 1].thresholdMs; thresholdStage = stage - 1; }
       const out = {
-        trials, n, accuracy: n ? nc / n : NaN,
+        trials, n, accuracy: n ? nc / n : NaN, clearedStages, thresholdStage,
         thresholdMs: Number.isFinite(thr) ? Math.round(thr * 10) / 10 : null,
         finalExposureMs: stair ? Math.round(stair.frames * frameMs * 10) / 10 : null,
         frameMs: Math.round(frameMs * 100) / 100, stage
@@ -1204,8 +1248,9 @@ window.Scout = (function () {
           stairUpdate(stair, correct);
           await feedback(correct);
           if (shouldAdvance(stair, stage)) {
+            clearedStages.push({ stage, thresholdMs: clearedMs(stair, frameMs) });
             stage++;
-            stair = makeStaircase(framesFor(opt.startExposureMs, frameMs), maxFramesFor(frameMs));
+            stair = makeStaircase(framesFor(RESTART_MS, frameMs), maxFramesFor(frameMs));
           }
         }
       }
@@ -2195,7 +2240,6 @@ window.Scout = (function () {
       navLink('↺', 'History', () => historyScreen()),
       navLink('⌖', 'Field drills', drills),
       navLink('⚙︎', 'Settings', settings),
-      document.documentElement.requestFullscreen && navLink('⤢', 'Full screen', () => { document.documentElement.requestFullscreen().catch(() => {}); })
     ]);
   }
 
@@ -2220,14 +2264,14 @@ window.Scout = (function () {
     ].filter(Boolean);
     const totalSec = rows.reduce((s, r) => { const [m, sec] = r[2].split(':').map(Number); return s + m * 60 + sec; }, 0);
 
-    show(el('main', { class: 'screen ms-home' }, [
+    show(el('div', { class: 'ms-homewrap' }, [el('main', { class: 'screen ms-home' }, [
       el('header', { class: 'ms-mast' }, [
         el('div', { class: 'ms-topbar' }, [el('h1', { class: 'ms-wordmark', text: 'First Light' }), topNav()]),
         el('div', { class: 'ms-meta' }, [
           el('span', { class: 'label', text: calibrating ? `Calibrating ${pad2(valid.length)}/${CALIBRATION_DAYS}` : `Baseline ${valid.length} sessions` }),
           el('span', { class: 'label', text: dateLabel }),
           el('span', { class: 'label', text: `Session ≈ ${Math.round(totalSec / 30) / 2} min` }),
-          el('span', { class: 'label ms-arrow', 'aria-hidden': 'true', text: '↓' })
+          el('span', { class: 'label ms-version', title: 'App version', text: 'v' + Scout.appVersion })
         ])
       ]),
       el('section', { class: 'ms-statement ms-in' }, [
@@ -2247,9 +2291,8 @@ window.Scout = (function () {
       ]))),
       el('div', { class: 'ms-actions' }, [
         el('button', { class: 'btn btn-primary btn-big', type: 'button', onclick: checkin }, [doneToday ? 'Run another session' : 'Begin session', el('span', { class: 'ms-icon', 'aria-hidden': 'true', text: '→' })])
-      ]),
-      sessionStrip(sessions)
-    ]));
+      ])
+    ]), sessionStrip(sessions)]));
   }
   const DR_LEVELS = ['Map view, square turns', 'Legs vanish', 'Angled turns', 'Turning with the world', 'Pace × time', 'Full integration'];
   function fmtClock(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -2403,11 +2446,7 @@ window.Scout = (function () {
       const startStage = t.wfStage;
       const wf = await runStage('widefield', { durationMs: TRAIN_MS, startExposureMs: t.wfExposureMs, stage: startStage, intensity });
       session.widefield = wf; upsertSession(session);
-      if (wf && wf.n >= 8 && Number.isFinite(wf.thresholdMs)) {
-        if (wf.stage > startStage) { t.wfStage = wf.stage; t.wfExposureMs = 250; }
-        else t.wfExposureMs = util.clamp(Math.round(wf.thresholdMs), 17, 500);
-        saveTrain(t);
-      }
+      if (wf && wf.n >= 8 && Number.isFinite(wf.thresholdMs)) { applyWideField(t, wf); saveTrain(t); }
       if (wf && wf.aborted) return done(session);
     }
     if (prefs.deadreck) {
@@ -2428,7 +2467,8 @@ window.Scout = (function () {
     if (session.readiness) items.push(row('Readiness', STATUS_TEXT[session.readiness.status][0], session.pvt ? `median ${Math.round(session.pvt.medianRT)} ms` : ''));
     if (session.widefield && Number.isFinite(session.widefield.thresholdMs)) {
       const w = session.widefield;
-      items.push(row('Wide Field', `${Math.round(w.thresholdMs)} ms`, `stage ${w.stage} · ${Math.round(w.accuracy * 100)}% correct` + (lastWf ? ` · last time ${Math.round(lastWf.widefield.thresholdMs)} ms` : '')));
+      const cleared = (w.clearedStages || []).map(c => `stage ${c.stage} cleared at ${Math.round(c.thresholdMs)} ms`).join(' · ');
+      items.push(row('Wide Field', `${Math.round(w.thresholdMs)} ms`, (cleared ? cleared + ` → now stage ${w.stage}` : `stage ${w.stage}`) + ` · ${Math.round(w.accuracy * 100)}% correct` + (lastWf ? ` · last time ${Math.round(lastWf.widefield.thresholdMs)} ms` : '')));
     }
     if (session.deadreck && Number.isFinite(session.deadreck.meanAngErr)) {
       const d = session.deadreck;
@@ -2595,7 +2635,38 @@ window.Scout = (function () {
     ]));
   }
 
+  /* Where tomorrow's Wide Field starts: today's threshold, or the restart level if a stage was just cleared. */
+  function applyWideField(t, wf) {
+    const L = Scout.modules.widefield._logic;
+    if (wf.stage > t.wfStage) t.wfStage = wf.stage;
+    t.wfExposureMs = (wf.thresholdStage != null && wf.thresholdStage !== wf.stage)
+      ? L.RESTART_MS
+      : util.clamp(Math.round(wf.thresholdMs), 17, 500);
+  }
+
+  /* v1.1.0: rescore earlier Wide Field sessions with the corrected rules (warm-up misses ignored, floor clears the stage). */
+  function migrate() {
+    try {
+      if (store.get('migratedTo', '') === Scout.appVersion) return;
+      const L = Scout.modules.widefield._logic;
+      const all = loadSessions();
+      let latest = null;
+      all.forEach(s => {
+        const w = s.widefield;
+        if (!w || !w.trials || !w.trials.length || w.rescored) return;
+        const r = L.rescore(w.trials, w.frameMs || 1000 / 60);
+        if (!r) return;
+        Object.assign(w, { thresholdMs: r.thresholdMs, thresholdStage: r.thresholdStage, clearedStages: r.cleared, stage: r.stage, rescored: true });
+        latest = w;
+      });
+      saveSessions(all);
+      if (latest && latest.n >= 8) { const t = loadTrain(); applyWideField(t, latest); saveTrain(t); }
+      store.set('migratedTo', Scout.appVersion);
+    } catch (e) { /* never block the app over a rescore */ }
+  }
+
   Scout.app = { computeReadiness, home };
+  migrate();
   home();
 })();
 
