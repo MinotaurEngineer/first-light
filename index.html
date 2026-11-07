@@ -1,0 +1,2604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<style>[hidden]{display:none!important}body{margin:0}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}img{max-width:100%}</style>
+</head>
+<body>
+<title>First Light</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: spec-sheet system. White page, full-bleed black bands, bone spec panels, hairline rules, square corners.
+   Training stages are always black, full-bleed. */
+:root {
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface-2: #EEECE5;   /* bone: spec panels */
+  --ink: #000000;
+  --muted: #6E6E6B;
+  --line: #D8D7D2;
+  --accent: #000000;      /* primary action = ink */
+  --accent-ink: #FFFFFF;
+  --signal: #B8862B;
+  --good: #2E8A57;
+  --warn: #C7951B;
+  --bad: #C5402E;
+  --band-bg: #000000;
+  --band-ink: #FFFFFF;
+  --band-muted: #8A8A86;
+  --band-line: #2A2A2A;
+  --stage-bg: #000000;
+  --stage-ink: #FFFFFF;
+  --font-display: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body: "Inter Tight", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 0px;
+  --tap: 52px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --surface: #000000; --surface-2: #171715; --ink: #FFFFFF; --muted: #8C8C88;
+    --line: #2B2B29; --accent: #FFFFFF; --accent-ink: #000000; --signal: #D9A54A;
+    --good: #4CAE76; --warn: #DDB04A; --bad: #E0614D;
+    --band-bg: #EEECE5; --band-ink: #000000; --band-muted: #6E6E6B; --band-line: #D2D0C8;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --surface: #000000; --surface-2: #171715; --ink: #FFFFFF; --muted: #8C8C88;
+  --line: #2B2B29; --accent: #FFFFFF; --accent-ink: #000000; --signal: #D9A54A;
+  --good: #4CAE76; --warn: #DDB04A; --bad: #E0614D;
+  --band-bg: #EEECE5; --band-ink: #000000; --band-muted: #6E6E6B; --band-line: #D2D0C8;
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45; letter-spacing: -0.005em;
+  -webkit-tap-highlight-color: transparent; overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+#app { min-height: 100%; position: relative; overflow-x: clip; }
+
+/* ---- screens ---- */
+.screen {
+  min-height: 100%; box-sizing: border-box;
+  padding-block: 24px 40px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+  max-width: 1200px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 28px;
+}
+/* Training stage: always black, whichever theme the page is in. */
+.stage {
+  position: fixed; inset: 0; background: var(--stage-bg); color: var(--stage-ink);
+  touch-action: none; user-select: none; -webkit-user-select: none; z-index: 20;
+  --bg: #000000; --surface: #0E0E0E; --surface-2: #1A1A19; --ink: #FFFFFF; --muted: #7C7C78; --line: #2A2A28;
+  --accent: #FFFFFF; --accent-ink: #000000; --signal: #E3B25A; --good: #4CAE76; --warn: #DDB04A; --bad: #E0614D;
+  color-scheme: dark;
+}
+.stage canvas { display: block; width: 100%; height: 100%; }
+
+/* ---- type ---- */
+.h-display {
+  font-family: var(--font-display); font-weight: 500; text-transform: uppercase;
+  font-size: clamp(2.6rem, 6.4vw, 5.6rem); line-height: 0.9; letter-spacing: -0.04em; margin: 0; text-wrap: balance;
+}
+.h-2 { font-family: var(--font-display); font-weight: 500; font-size: 1.35rem; line-height: 1.15; letter-spacing: -0.015em; margin: 0; text-wrap: balance; }
+.label { font-family: var(--font-mono); font-weight: 400; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.muted { color: var(--muted); }
+.prose { max-width: 60ch; }
+
+/* ---- controls: thin rectangles, small sentence-case text ---- */
+.btn {
+  appearance: none; border: 1px solid var(--ink); background: transparent; color: var(--ink);
+  font: 500 0.95rem/1 var(--font-body); letter-spacing: -0.005em;
+  min-height: var(--tap); padding: 0 20px; border-radius: 0;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+}
+.btn:active { background: var(--surface-2); }
+.btn:focus-visible, .seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn-primary:active { opacity: 0.85; background: var(--accent); }
+.btn-big { min-height: 64px; font-size: 1.05rem; padding: 0 32px; }
+.btn-quiet { border-color: transparent; color: var(--muted); padding: 0 8px; }
+.btn-danger { background: var(--bad); border-color: var(--bad); color: #FFFFFF; }
+.btn[disabled] { opacity: 0.35; cursor: default; }
+
+.seg { display: flex; flex-wrap: wrap; gap: 0; }
+.seg button {
+  appearance: none; min-height: 50px; min-width: 76px; padding: 0 18px; border-radius: 0;
+  border: 1px solid var(--line); margin-left: -1px; background: transparent; color: var(--ink);
+  font: 500 0.95rem/1 var(--font-body); cursor: pointer;
+}
+.seg button:first-child { margin-left: 0; }
+.seg button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--bg); position: relative; z-index: 1; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 0; padding: 20px 22px; }
+.row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+.spread { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+/* Status markers are small squares. */
+.dot { width: 12px; height: 12px; border-radius: 0; display: inline-block; background: var(--line); }
+.dot.green { background: var(--good); } .dot.amber { background: var(--warn); } .dot.red { background: var(--bad); }
+.dot.calibrating { background: transparent; border: 1px solid var(--muted); box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (max-width: 600px) { .screen { gap: 20px; } }
+
+/* PVT — calm, nearly empty stage. */
+.pvt-root { position: absolute; inset: 0; color: var(--stage-ink); font-family: var(--font-body); }
+.pvt-running { cursor: pointer; }
+
+.pvt-intro {
+  position: absolute; inset: 0; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 18px;
+  padding: 32px max(32px, env(safe-area-inset-right, 0px)) 32px max(32px, env(safe-area-inset-left, 0px));
+  max-width: 720px; margin: 0 auto;
+}
+.pvt-copy { margin: 0 0 12px; font-size: 1.15rem; color: var(--stage-ink); }
+.pvt-start { min-width: 220px; }
+
+.pvt-counter {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-size: clamp(4.5rem, 14vmin, 9rem); font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+  color: var(--signal); visibility: hidden; pointer-events: none;
+}
+.pvt-counter.pvt-on { visibility: visible; }
+.pvt-counter.pvt-frozen { color: var(--stage-ink); }
+
+.pvt-flash {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-family: var(--font-display); font-weight: 600; font-size: 2rem; letter-spacing: 0.04em;
+  color: var(--bad); opacity: 0; pointer-events: none; transition: opacity 120ms ease-out;
+}
+.pvt-flash.pvt-show { opacity: 1; }
+
+.pvt-clock {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top, 0px));
+  right: max(24px, env(safe-area-inset-right, 0px));
+  font-size: 1rem; color: var(--muted); visibility: hidden; pointer-events: none;
+}
+.pvt-running .pvt-clock { visibility: visible; }
+
+.pvt-end {
+  position: absolute; min-width: var(--tap);
+  left: max(12px, env(safe-area-inset-left, 0px));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+}
+
+/* Wide Field module */
+.wf-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.wf-layer { position: absolute; inset: 0; z-index: 2; }
+.wf-layer:empty { pointer-events: none; }
+
+.wf-hud {
+  position: absolute; z-index: 3; pointer-events: none;
+  top: max(14px, env(safe-area-inset-top, 0px));
+  left: max(18px, env(safe-area-inset-left, 0px));
+}
+.wf-rep { font-variant-numeric: tabular-nums; }
+.wf-bar {
+  position: absolute; z-index: 3; left: 0; right: 0; top: 0; height: 3px;
+  background: var(--line); pointer-events: none;
+}
+.wf-bar-fill { height: 100%; background: var(--accent); transform-origin: left center; transition: transform 0.5s linear; }
+.wf-end {
+  position: absolute; z-index: 4; min-width: var(--tap);
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: max(12px, env(safe-area-inset-right, 0px));
+}
+
+/* instruction */
+.wf-intro {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+  background: var(--stage-bg); overflow-y: auto;
+}
+.wf-card { max-width: 620px; width: 100%; display: flex; flex-direction: column; gap: 18px; padding: 28px 30px; }
+.wf-prose p { margin: 0 0 10px; }
+.wf-card .btn-big { align-self: flex-start; min-width: 200px; }
+
+/* answer: centre symbol */
+.wf-ask {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 28px; padding: 16px;
+}
+.wf-q { margin: 0; color: var(--stage-ink); font-family: var(--font-display); font-weight: 600; font-size: 1.6rem; text-align: center; }
+.wf-syms { display: flex; gap: 32px; flex-wrap: wrap; justify-content: center; }
+.wf-sym {
+  width: min(28vmin, 180px); height: min(28vmin, 180px); min-width: 112px; min-height: 112px;
+  padding: 0; color: var(--stage-ink); touch-action: manipulation;
+}
+.wf-sym svg { width: 52%; height: 52%; }
+
+/* answer: spoke ring (whole layer is the wedge hit-area) */
+.wf-ring { position: absolute; inset: 0; cursor: pointer; touch-action: manipulation; }
+.wf-spoke {
+  position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+  border-radius: 50%; border: 2px solid var(--line); background: var(--surface); color: var(--signal);
+  pointer-events: none;
+}
+.wf-spoke svg { width: 46%; height: 46%; }
+.wf-spoke-hit { background: var(--signal); border-color: var(--signal); color: var(--surface); }
+.wf-q-ring {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  max-width: 34vmin; font-size: 1.25rem; line-height: 1.15; pointer-events: none;
+}
+
+/* feedback */
+.wf-fb {
+  position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px;
+  border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 2px solid currentColor; pointer-events: none;
+}
+.wf-fb svg { width: 60%; height: 60%; }
+.wf-fb-ok { color: var(--good); }
+.wf-fb-no { color: var(--bad); }
+
+/* Dead Reckoning module */
+.dr-root { position: absolute; inset: 0; overflow: hidden; }
+.dr-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+
+.dr-timebar { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--line); }
+.dr-timefill { height: 100%; background: var(--accent); transform-origin: left center; transform: scaleX(1); }
+
+.dr-hud {
+  position: absolute; top: 10px;
+  left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; pointer-events: none;
+}
+.dr-hud-left { display: flex; align-items: center; gap: 12px; }
+.dr-hud .dr-end { pointer-events: auto; min-width: var(--tap); }
+.dr-badge {
+  font-size: 0.95rem; font-weight: 600; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+}
+
+.dr-hint {
+  position: absolute; top: 72px; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-body); color: var(--muted); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px; pointer-events: none; white-space: nowrap;
+}
+.dr-lock {
+  position: absolute; bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  right: max(20px, env(safe-area-inset-right, 0px));
+}
+
+.dr-overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  padding: 72px max(20px, env(safe-area-inset-right, 0px)) 24px max(20px, env(safe-area-inset-left, 0px));
+  box-sizing: border-box; background: color-mix(in srgb, var(--stage-bg) 72%, transparent);
+}
+.dr-overlay[hidden], .dr-hint[hidden], .dr-lock[hidden], .dr-toast[hidden] { display: none; }
+.dr-overlay.dr-overlay-side { background: transparent; justify-content: flex-end; align-items: center; pointer-events: none; }
+.dr-overlay-side .dr-panel { pointer-events: auto; }
+.dr-panel { max-width: 560px; width: 100%; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; }
+.dr-panel p { margin: 0; }
+.dr-panel .btn-big { align-self: flex-start; margin-top: 8px; }
+
+.dr-feedback { max-width: 360px; }
+.dr-scores { display: flex; gap: 28px; }
+.dr-big { font-size: 2.8rem; line-height: 1; font-weight: 600; color: var(--ink); }
+.dr-coach { font-size: 1.05rem; }
+.dr-legend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); }
+.dr-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.dr-sw { display: inline-block; width: 22px; height: 4px; border-radius: 2px; }
+.dr-sw-good { background: var(--good); }
+.dr-sw-signal { background: var(--signal); }
+
+.dr-toast {
+  position: absolute; top: 64px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: var(--accent-ink); font-family: var(--font-display);
+  font-weight: 600; font-size: 1.3rem; letter-spacing: 0.04em; padding: 10px 22px; border-radius: 999px;
+  pointer-events: none; z-index: 2;
+}
+
+@media (orientation: portrait) {
+  .dr-overlay.dr-overlay-side { align-items: flex-end; justify-content: center; }
+  .dr-feedback { max-width: 100%; }
+}
+
+/* history module */
+.hs-root { display: flex; flex-direction: column; gap: 20px; }
+.hs-body { display: flex; flex-direction: column; gap: 16px; }
+.hs-card { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
+.hs-chart-head { gap: 4px 16px; }
+.hs-caption { font-size: 0.85rem; }
+.hs-chart { width: 100%; position: relative; overflow: hidden; }
+.hs-svg { display: block; overflow: visible; }
+
+.hs-grid { stroke: var(--line); stroke-width: 1; }
+.hs-axis { fill: var(--muted); font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; }
+.hs-marker { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 4; }
+.hs-marker-label { fill: var(--ink); }
+.hs-band { fill: var(--accent); fill-opacity: 0.12; stroke: none; }
+.hs-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.hs-bar { fill: var(--accent); fill-opacity: 0.55; }
+.hs-bar.hs-last { fill-opacity: 1; }
+.hs-pt { fill: var(--accent); stroke: var(--surface); stroke-width: 1.5; }
+.hs-pt-green { fill: var(--good); }
+.hs-pt-amber { fill: var(--warn); }
+.hs-pt-red { fill: var(--bad); }
+.hs-pt-calibrating { fill: var(--surface); stroke: var(--muted); stroke-width: 1.5; }
+.hs-pt.hs-last { stroke-width: 2.5; }
+.hs-pt-calibrating.hs-last { stroke-width: 2; }
+
+.hs-summary { display: flex; flex-wrap: wrap; gap: 12px 36px; padding: 2px 4px; }
+.hs-stat { display: flex; flex-direction: column; gap: 2px; }
+.hs-stat-val { font-size: 1.6rem; line-height: 1.1; display: flex; align-items: baseline; gap: 6px; }
+.hs-unit { font-size: 0.9rem; }
+.hs-empty { text-align: center; padding: 36px 22px; }
+
+.hs-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; max-width: 420px; }
+.hs-cal-head { text-align: center; font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.hs-cal-cell { height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 8px; border: 2px solid transparent; }
+.hs-cal-today { border-color: var(--ink); }
+.hs-cal-future .hs-cal-dot { opacity: 0.35; }
+.hs-cal-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--surface-2); box-sizing: border-box; }
+.hs-cal-green { background: var(--good); }
+.hs-cal-amber { background: var(--warn); }
+.hs-cal-red { background: var(--bad); }
+.hs-cal-logged { background: transparent; border: 1px dashed var(--muted); }
+.hs-cal-calibrating { background: transparent; border: 2px solid var(--muted); }
+
+.hs-clear { display: flex; justify-content: flex-end; }
+.hs-confirm { display: flex; flex-direction: column; gap: 14px; border-color: var(--bad); }
+.hs-confirm-text { margin: 0; }
+
+@media (max-width: 600px) {
+  .hs-summary { gap: 10px 24px; }
+  .hs-stat-val { font-size: 1.3rem; }
+  .hs-clear { justify-content: stretch; }
+}
+
+/* Visual-language overrides for module pieces: square corners, hairlines, mono labels. */
+.wf-root *, .dr-root *, .pvt-root *, .hs-root * { border-radius: 0 !important; }
+.hs-cal-dot { border-radius: 0 !important; }
+.hs-cal-cell { border-radius: 0 !important; }
+[class^="dr-"], [class*=" dr-"], [class^="wf-"], [class*=" wf-"], [class^="hs-"], [class*=" hs-"], [class^="pvt-"], [class*=" pvt-"] { border-radius: 0 !important; box-shadow: none !important; }
+.stage .h-2, .stage .h-display { color: var(--stage-ink); }
+/* Panels fade in at 250 ms. Stimuli (PVT counter, Wide Field flash/mask, walker) are never animated. */
+@keyframes ms-fade-panel { from { opacity: 0; } to { opacity: 1; } }
+.pvt-intro, .wf-intro, .wf-card, .dr-panel, .dr-feedback, .dr-overlay { animation: ms-fade-panel 250ms ease-out both; }
+@media (prefers-reduced-motion: reduce) { .pvt-intro, .wf-intro, .wf-card, .dr-panel, .dr-feedback, .dr-overlay { animation: none; } }
+
+/* App shell screens (prefix ms-) */
+.ms-small { font-size: 0.85rem; }
+.ms-unit { font-size: 0.5em; color: var(--muted); margin-left: 6px; letter-spacing: 0.02em; }
+
+/* masthead */
+.ms-mast { display: flex; flex-direction: column; gap: 14px; padding-top: 12px; }
+.ms-wordmark {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(3rem, 8.5vw, 7rem); line-height: 0.88; letter-spacing: -0.055em;
+}
+.ms-meta { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 16px; align-items: end; }
+.ms-arrow { font-size: 1.1rem; color: var(--ink); }
+
+/* statement */
+.ms-statement { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 32px; align-items: end; padding-block: 36px 8px; }
+.ms-statement-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ms-statement-side p { margin: 0; }
+.ms-calbar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; max-width: 280px; }
+.ms-calbar span { height: 8px; background: var(--line); }
+.ms-calbar span.on { background: var(--ink); }
+
+/* spec rows: name | description | value, separated by hairlines */
+.ms-rows { border-top: 1px solid var(--ink); }
+.ms-specrow {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr) auto; gap: 24px; align-items: baseline;
+  padding-block: 18px; border-bottom: 1px solid var(--line);
+}
+.ms-specname { font-size: 1.25rem; font-weight: 500; letter-spacing: -0.015em; }
+.ms-specdesc { font-size: 0.92rem; }
+.ms-spectime { font-size: 0.95rem; }
+
+.ms-actions { align-items: center; }
+.ms-nav { gap: 8px; }
+
+/* black band */
+.ms-week {
+  width: 100vw; margin-left: calc(50% - 50vw); margin-bottom: -40px; margin-top: auto;
+  background: var(--band-bg); color: var(--band-ink);
+  padding-block: 36px 48px;
+  padding-left: max(24px, env(safe-area-inset-left, 0px)); padding-right: max(24px, env(safe-area-inset-right, 0px));
+  box-sizing: border-box;
+}
+.ms-week > * { max-width: 1152px; margin-inline: auto; }
+.ms-week .label { color: var(--band-muted); display: block; margin-bottom: 14px; }
+.ms-weekrow { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid var(--band-line); }
+.ms-day { display: flex; flex-direction: column; gap: 14px; padding: 14px 0 0; border-right: 1px solid var(--band-line); padding-left: 10px; }
+.ms-day:last-child { border-right: none; }
+.ms-day .ms-small { color: var(--band-muted); font-family: var(--font-mono); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.ms-day.today .ms-small { color: var(--band-ink); }
+.ms-day .dot { width: 14px; height: 14px; background: var(--band-line); }
+.ms-day .dot.green { background: var(--good); } .ms-day .dot.amber { background: var(--warn); } .ms-day .dot.red { background: var(--bad); }
+.ms-day .dot.calibrating { background: transparent; border: 1px solid var(--band-muted); }
+.ms-future { opacity: 0.35; }
+
+/* check-in */
+.ms-kss { display: flex; flex-direction: column; gap: 14px; }
+.ms-kssval { font-size: 2.4rem; font-weight: 500; color: var(--ink); }
+.ms-range { width: 100%; height: 44px; accent-color: var(--ink); }
+.ms-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 40px; border-top: 1px solid var(--ink); }
+.ms-field { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding-block: 18px; border-bottom: 1px solid var(--line); }
+.ms-right { justify-content: flex-end; }
+
+/* readout */
+.ms-readout { justify-content: center; }
+.ms-readout-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; align-items: start; padding-top: 24px; }
+.ms-readout-left { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+.ms-readout-left p { margin: 0; }
+.ms-trainblock { border-top: 1px solid var(--ink); padding-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+.ms-speccard { background: var(--surface-2); padding: 22px 22px 8px; display: flex; flex-direction: column; min-width: 0; }
+.ms-specttl { font-weight: 600; font-size: 0.95rem; }
+.ms-speccard > .spread { padding-bottom: 28px; }
+.ms-specline { border-top: 1px solid var(--line); padding-block: 10px 14px; display: flex; flex-direction: column; gap: 6px; }
+.ms-specvals { display: grid; grid-template-columns: 96px minmax(0, 1fr) 84px; gap: 14px; align-items: center; }
+.ms-specval { font-size: 1.6rem; font-weight: 500; line-height: 1; }
+.ms-usual { text-align: right; }
+.ms-redact { height: 12px; background: var(--ink); width: 70%; }
+.ms-gauge { position: relative; height: 12px; border-bottom: 1px solid var(--muted); }
+.ms-gauge-band { position: absolute; top: 2px; bottom: 2px; background: var(--muted); opacity: 0.35; }
+.ms-gauge-mark { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1.5px; background: var(--ink); }
+
+/* done */
+.ms-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0; padding: 0; border: none; border-top: 1px solid var(--ink); }
+.ms-sumrow { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px 18px 0; border-bottom: 1px solid var(--line); }
+.ms-carry { background: var(--surface-2); padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; }
+.ms-carry p { margin: 0; }
+
+/* drills */
+.ms-drills { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 0 40px; border-top: 1px solid var(--ink); }
+.ms-drill { display: flex; flex-direction: column; gap: 10px; border: none; border-bottom: 1px solid var(--line); padding: 20px 0; }
+.ms-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.ms-steps li::marker { font-family: var(--font-mono); font-size: 0.8em; color: var(--muted); }
+.ms-drill p { margin: 0; }
+
+/* settings */
+.ms-setrows { display: flex; flex-direction: column; gap: 20px; }
+.ms-confirm { background: var(--surface-2); border: none; display: flex; flex-direction: column; gap: 12px; }
+.ms-confirm p { margin: 0; }
+.ms-samplenote { margin: 0; padding: 12px 16px; background: var(--surface-2); color: var(--ink); font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.ms-historyhost { min-width: 0; }
+
+/* inner screens use a smaller display size */
+.screen:not(.ms-home):not(.ms-readout) > header .h-display { font-size: clamp(2.2rem, 5vw, 4rem); }
+
+body.ms-running { overflow: hidden; }
+
+@media (max-width: 760px) {
+  .ms-meta { grid-template-columns: 1fr 1fr; }
+  .ms-arrow { display: none; }
+  .ms-statement, .ms-readout-grid { grid-template-columns: minmax(0, 1fr); }
+  .ms-specrow { grid-template-columns: minmax(0, 1fr) auto; }
+  .ms-specdesc { grid-column: 1 / -1; grid-row: 2; }
+  .ms-fields, .ms-drills { grid-template-columns: minmax(0, 1fr); }
+  .ms-specvals { grid-template-columns: 80px minmax(0, 1fr) 70px; }
+}
+
+/* ---- header nav ---- */
+.ms-topbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; flex-wrap: wrap; }
+.ms-topnav { display: flex; flex-wrap: wrap; gap: 4px 6px; padding-top: 10px; }
+.ms-navlink {
+  appearance: none; background: transparent; border: none; border-bottom: 1px solid transparent; color: var(--ink);
+  font: 500 0.95rem/1 var(--font-body); min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  transition: border-color 250ms ease-out, color 250ms ease-out;
+}
+.ms-navlink:hover, .ms-navlink:focus-visible { border-bottom-color: var(--ink); outline: none; }
+.ms-navlink:active { color: var(--muted); }
+.ms-icon { font-family: var(--font-mono); font-size: 1.05em; line-height: 1; }
+.btn .ms-icon { margin-left: 2px; }
+
+/* ---- full-height home: content top, session band pinned to the bottom ---- */
+.ms-home { min-height: 100vh; min-height: 100dvh; }
+.ms-actions { display: flex; }
+.ms-week .spread { margin-bottom: 14px; }
+.ms-week .spread .label { margin-bottom: 0; }
+.ms-day .dot.none { background: transparent; border: 1px dashed var(--band-muted); box-sizing: border-box; }
+.ms-day .ms-small:last-child { font-family: var(--font-mono); font-size: 0.72rem; color: var(--band-muted); }
+
+/* ---- check-in question hints ---- */
+.ms-q { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- 250 ms fades on screen changes and panels; test stimuli never fade ---- */
+@keyframes ms-fade { from { opacity: 0; } to { opacity: 1; } }
+#app > .screen { animation: ms-fade 250ms ease-out both; }
+.ms-in { animation: ms-fade 250ms ease-out both; }
+.ms-confirm:not([hidden]) { animation: ms-fade 250ms ease-out both; }
+.stage { animation: ms-fade 250ms ease-out both; }
+.btn, .seg button { transition: background-color 250ms ease-out, color 250ms ease-out, border-color 250ms ease-out, opacity 250ms ease-out; }
+
+@media (max-width: 760px) {
+  .ms-topnav { padding-top: 0; margin-left: -10px; }
+}
+
+/* ---- compact home so the band sits at the bottom of a landscape tablet with room above it ---- */
+.ms-home { gap: 20px; padding-block: 20px 40px; }
+.ms-home .ms-mast { padding-top: 4px; gap: 10px; }
+.ms-home .ms-wordmark { font-size: clamp(2.8rem, 7vw, 5.6rem); }
+.ms-home .ms-statement { padding-block: 20px 0; }
+.ms-home .ms-statement .h-display { font-size: clamp(2.4rem, 5.6vw, 4.8rem); }
+.ms-home .ms-specrow { padding-block: 13px; }
+.ms-week { padding-block: 22px 30px; }
+.ms-weekrow { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+.ms-day { gap: 10px; padding: 10px 0 0 8px; }
+@media (max-width: 760px) {
+  .ms-day { padding-left: 4px; }
+  .ms-day .ms-small { font-size: 0.62rem !important; }
+}
+
+/* landscape tablets: browser chrome leaves roughly 740-780px of height */
+@media (min-width: 761px) and (max-height: 860px) {
+  .ms-home { gap: 16px; padding-block: 14px 40px; }
+  .ms-home .ms-wordmark { font-size: 4.4rem; }
+  .ms-home .ms-topnav { padding-top: 4px; }
+  .ms-home .ms-statement { padding-block: 10px 0; }
+  .ms-home .ms-statement .h-display { font-size: 3.6rem; }
+  .ms-home .ms-specrow { padding-block: 10px; }
+  .ms-home .btn-big { min-height: 56px; }
+  .ms-week { padding-block: 16px 24px; }
+  .ms-week .spread { margin-bottom: 8px; }
+  .ms-day { gap: 6px; padding-top: 8px; }
+}
+
+/* ---- about ---- */
+.ms-lede { font-size: 1.35rem; line-height: 1.35; letter-spacing: -0.015em; margin: 0; max-width: 46ch; }
+.ms-aboutlist { border-top: 1px solid var(--ink); }
+.ms-aboutrow { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.4fr) minmax(0, 1.2fr); gap: 28px; padding-block: 24px; border-bottom: 1px solid var(--line); }
+.ms-aboutrow h2 { margin: 0; }
+.ms-aboutcol { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ms-aboutcol p { margin: 0; }
+.ms-phases { display: flex; flex-direction: column; gap: 14px; }
+.ms-phasegrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--surface-2); }
+.ms-phase { padding: 20px 22px; display: flex; flex-direction: column; gap: 8px; border-right: 1px solid var(--line); }
+.ms-phase:last-child { border-right: none; }
+.ms-phase p { margin: 0; }
+.ms-phasewhen { font-size: 0.8rem; color: var(--muted); }
+.ms-phasetitle { font-size: 1.25rem; font-weight: 500; letter-spacing: -0.015em; }
+.ms-limits { border-top: 1px solid var(--ink); padding-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.ms-limits ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; max-width: 70ch; }
+@media (max-width: 760px) {
+  .ms-aboutrow, .ms-phasegrid { grid-template-columns: minmax(0, 1fr); }
+  .ms-phase { border-right: none; border-bottom: 1px solid var(--line); }
+}
+
+</style>
+<div id="app"></div>
+<script>
+/* First Light — shared core. Every module relies on window.Scout. */
+window.Scout = (function () {
+  const PREFIX = 'scout.v1.';
+
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem(PREFIX + key); return v == null ? fallback : JSON.parse(v); }
+      catch (e) { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(PREFIX + key, JSON.stringify(value)); return true; }
+      catch (e) { return false; }
+    },
+    clearAll() {
+      try {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(PREFIX)) keys.push(k); }
+        keys.forEach(k => localStorage.removeItem(k));
+      } catch (e) { /* storage blocked */ }
+    }
+  };
+
+  const stats = {
+    mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN; },
+    sd(a) {
+      if (a.length < 2) return NaN;
+      const m = stats.mean(a);
+      return Math.sqrt(a.reduce((s, x) => s + (x - m) * (x - m), 0) / (a.length - 1));
+    },
+    median(a) { return stats.quantile(a, 0.5); },
+    quantile(a, q) {
+      if (!a.length) return NaN;
+      const s = [...a].sort((x, y) => x - y);
+      const pos = (s.length - 1) * q, lo = Math.floor(pos), hi = Math.ceil(pos);
+      return s[lo] + (s[hi] - s[lo]) * (pos - lo);
+    },
+    /* Rolling baseline over the last `window` finite values. */
+    baseline(values, window = 28) {
+      const v = values.filter(Number.isFinite).slice(-window);
+      return { mean: stats.mean(v), sd: stats.sd(v), n: v.length };
+    }
+  };
+
+  const util = {
+    el(tag, attrs, children) {
+      const node = document.createElement(tag);
+      if (attrs) for (const [k, v] of Object.entries(attrs)) {
+        if (v == null || v === false) continue;
+        if (k === 'class') node.className = v;
+        else if (k === 'text') node.textContent = v;
+        else if (k === 'html') node.innerHTML = v;
+        else if (k.startsWith('on') && typeof v === 'function') node.addEventListener(k.slice(2), v);
+        else node.setAttribute(k, v === true ? '' : v);
+      }
+      (Array.isArray(children) ? children : children == null ? [] : [children]).forEach(c => {
+        if (c == null || c === false) return;
+        node.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
+      });
+      return node;
+    },
+    clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); },
+    rand(min, max) { return min + Math.random() * (max - min); },
+    randInt(min, max) { return Math.floor(min + Math.random() * (max - min + 1)); },
+    shuffle(a) { const b = [...a]; for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; },
+    now() { return performance.now(); },
+    nextFrame() { return new Promise(r => requestAnimationFrame(r)); },
+    /* Resolves after ms, or early (with false) if signal aborts. */
+    sleep(ms, signal) {
+      return new Promise(resolve => {
+        const t = setTimeout(() => resolve(true), ms);
+        if (signal) signal.addEventListener('abort', () => { clearTimeout(t); resolve(false); }, { once: true });
+      });
+    },
+    /* Reads a CSS custom property from :root, so canvas drawing follows the theme. */
+    cssVar(name) { return getComputedStyle(document.querySelector('.stage') || document.documentElement).getPropertyValue(name).trim(); },
+    /* Sizes a canvas to its CSS box at device pixel ratio; returns {ctx, w, h, dpr} in CSS pixels. */
+    fitCanvas(canvas) {
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const r = canvas.getBoundingClientRect();
+      canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+      const ctx = canvas.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: r.width, h: r.height, dpr };
+    },
+    deg2rad(d) { return d * Math.PI / 180; },
+    rad2deg(r) { return r * 180 / Math.PI; },
+    /* Smallest signed difference a-b in degrees, range (-180, 180]. */
+    angleDiff(a, b) { let d = ((a - b) % 360 + 540) % 360 - 180; return d === -180 ? 180 : d; },
+    todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  };
+
+  return { store, stats, util, modules: {}, version: 1 };
+})();
+
+;
+/* First Light — PVT-B (brief psychomotor vigilance test), the readiness measure. */
+(function () {
+  const Scout = window.Scout;
+  const { stats } = Scout;
+
+  const ISI_MIN = 1000, ISI_MAX = 4000;
+  const LAPSE_MS = 355, TIMEOUT_MS = 30000, ANTICIPATION_MS = 100;
+  const FREEZE_MS = 1000, FLASH_MS = 700;
+
+  const round1 = x => (Number.isFinite(x) ? Math.round(x * 10) / 10 : null);
+
+  /* Pure summary of a trial list. Valid responses = not false starts, rt recorded (timeouts count as 30000). */
+  function summarize(trials, durationMs) {
+    const rts = trials.filter(t => !t.falseStart && Number.isFinite(t.rt)).map(t => t.rt);
+    const sorted = [...rts].sort((a, b) => a - b);
+    const k = sorted.length ? Math.max(1, Math.round(sorted.length * 0.1)) : 0;
+    return {
+      trials,
+      n: rts.length,
+      medianRT: round1(stats.median(rts)),
+      meanRT: round1(stats.mean(rts)),
+      lapses: rts.filter(r => r >= LAPSE_MS).length,
+      slow10: k ? round1(stats.mean(sorted.slice(-k))) : null,
+      fast10: k ? round1(stats.mean(sorted.slice(0, k))) : null,
+      falseStarts: trials.filter(t => t.falseStart).length,
+      durationMs
+    };
+  }
+
+  function fmtClock(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  }
+
+  function run(container, options = {}) {
+    const { el } = Scout.util;
+    const durationMs = Number.isFinite(options.durationMs) ? options.durationMs : 180000;
+    const signal = options.signal;
+
+    return new Promise(resolve => {
+      const trials = [];
+      let done = false, started = false;
+      let raf = 0, endTimer = 0;
+      let testStart = 0, endAt = 0;
+      // phase: 'intro' | 'isi' | 'stim' | 'freeze'
+      let phase = 'intro';
+      let isi = 0, isiStart = 0, isiEnd = 0;
+      let onset = null;          // performance.now() at first paint of the counter
+      let freezeEnd = 0, flashEnd = 0;
+      let lastClock = '';
+
+      /* ---- DOM ---- */
+      const root = el('div', { class: 'pvt-root' });
+      const startBtn = el('button', { class: 'btn btn-primary btn-big pvt-start', type: 'button', text: 'Start' });
+      const intro = el('div', { class: 'pvt-intro' }, [
+        el('div', { class: 'label', text: 'Readiness · 3 minutes' }),
+        el('h1', { class: 'h-display', text: 'Reaction check' }),
+        el('p', { class: 'prose pvt-copy', text: 'Numbers will appear in the middle of the screen at random moments. Tap anywhere the instant you see them. Don’t tap early — wait for the number.' }),
+        startBtn
+      ]);
+      const counter = el('div', { class: 'num pvt-counter', 'aria-live': 'off' });
+      const flash = el('div', { class: 'pvt-flash', text: 'Too soon' });
+      const clock = el('div', { class: 'num pvt-clock', 'aria-label': 'Time remaining' });
+      const endBtn = el('button', { class: 'btn btn-quiet pvt-end', type: 'button', text: 'End' });
+      root.append(intro, counter, flash, clock, endBtn);
+      container.appendChild(root);
+
+      /* ---- flow ---- */
+      function finish(aborted) {
+        if (done) return;
+        done = true;
+        cancelAnimationFrame(raf);
+        clearTimeout(endTimer);
+        root.removeEventListener('pointerdown', onPointer);
+        startBtn.removeEventListener('click', onStart);
+        endBtn.removeEventListener('pointerdown', stopProp);
+        endBtn.removeEventListener('click', onEnd);
+        if (signal) signal.removeEventListener('abort', onAbort);
+        root.remove();
+        const res = summarize(trials, durationMs);
+        if (aborted) res.aborted = true;
+        resolve(res);
+      }
+
+      function beginISI(now) {
+        isi = Scout.util.rand(ISI_MIN, ISI_MAX);
+        isiStart = now; isiEnd = now + isi;
+        onset = null;
+        phase = 'isi';
+        counter.classList.remove('pvt-on', 'pvt-frozen');
+        counter.textContent = '';
+      }
+
+      function falseStart(now, extra) {
+        trials.push(Object.assign({ isi: Math.round(isi), rt: null, falseStart: true, t: Math.round(now - testStart) }, extra));
+        flashEnd = now + FLASH_MS;
+        flash.classList.add('pvt-show');
+        beginISI(now);
+      }
+
+      function onStart() {
+        if (started || done) return;
+        started = true;
+        intro.remove();
+        root.classList.add('pvt-running');
+        testStart = performance.now();
+        endAt = testStart + durationMs;
+        endTimer = setTimeout(() => finish(false), durationMs + 50); // backstop if rAF is throttled
+        beginISI(testStart);
+        root.addEventListener('pointerdown', onPointer);
+        raf = requestAnimationFrame(frame);
+      }
+
+      function frame() {
+        if (done) return;
+        const now = performance.now();
+        if (now >= endAt) { finish(false); return; }
+
+        const c = fmtClock(endAt - now);
+        if (c !== lastClock) { clock.textContent = c; lastClock = c; }
+        if (flashEnd && now >= flashEnd) { flash.classList.remove('pvt-show'); flashEnd = 0; }
+
+        if (phase === 'isi' && now >= isiEnd) {
+          counter.textContent = '0';
+          counter.classList.add('pvt-on');
+          onset = performance.now(); // timestamp of the frame that first paints the counter
+          phase = 'stim';
+        } else if (phase === 'stim') {
+          const dt = now - onset;
+          if (dt >= TIMEOUT_MS) {
+            trials.push({ isi: Math.round(isi), rt: TIMEOUT_MS, falseStart: false, t: Math.round(onset - testStart) });
+            counter.textContent = String(TIMEOUT_MS);
+            counter.classList.add('pvt-frozen');
+            phase = 'freeze'; freezeEnd = now + FREEZE_MS;
+          } else {
+            counter.textContent = String(Math.floor(dt));
+          }
+        } else if (phase === 'freeze' && now >= freezeEnd) {
+          beginISI(now);
+        }
+        raf = requestAnimationFrame(frame);
+      }
+
+      function onPointer(e) {
+        if (done || !started || e.isPrimary === false) return;
+        if (e.button != null && e.button > 0) return;
+        const pnow = performance.now();
+        if (pnow >= endAt) return;
+        // event timeStamp shares performance.now()'s timebase in modern browsers; guard against odd values
+        let ts = e.timeStamp;
+        if (!Number.isFinite(ts) || ts <= 0 || ts > pnow + 1 || pnow - ts > 1000) ts = pnow;
+
+        if (phase === 'isi') { falseStart(pnow); return; }
+        if (phase !== 'stim' || onset == null) return; // freeze: ignore
+        const rt = ts - onset;
+        if (rt < ANTICIPATION_MS) { falseStart(pnow, { anticipationRt: Math.round(rt) }); return; }
+        trials.push({ isi: Math.round(isi), rt: Math.round(rt), falseStart: false, t: Math.round(onset - testStart) });
+        counter.textContent = String(Math.round(rt));
+        counter.classList.add('pvt-frozen');
+        phase = 'freeze'; freezeEnd = pnow + FREEZE_MS;
+      }
+
+      function stopProp(e) { e.stopPropagation(); }
+      function onEnd() {
+        if (options.onExit) options.onExit();
+        if (!signal) finish(true);
+      }
+      function onAbort() { finish(true); }
+
+      startBtn.addEventListener('click', onStart);
+      endBtn.addEventListener('pointerdown', stopProp);
+      endBtn.addEventListener('click', onEnd);
+      if (signal) {
+        if (signal.aborted) { finish(true); return; }
+        signal.addEventListener('abort', onAbort);
+      }
+      clock.textContent = fmtClock(durationMs);
+    });
+  }
+
+  Scout.modules.pvt = { run, summarize };
+})();
+
+;
+/* First Light — Wide Field: useful-field-of-view (speed-of-processing) training. */
+(function () {
+  const root = typeof window !== 'undefined' ? window : globalThis;
+
+  /* ---------- pure logic (node-testable, no DOM) ---------- */
+  const ECC = { 1: 0.55, 2: 0.7, 3: 0.85 };
+  const DISTRACTORS = { 1: 0, 2: 24, 3: 40 };
+  const MAX_EXPOSURE_MS = 500;
+
+  function medianOf(a) {
+    if (!a.length) return NaN;
+    const s = [...a].sort((x, y) => x - y), m = s.length >> 1;
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+  function maxFramesFor(frameMs) { return Math.max(1, Math.round(MAX_EXPOSURE_MS / frameMs)); }
+  function framesFor(ms, frameMs) { return Math.max(1, Math.min(maxFramesFor(frameMs), Math.round(ms / frameMs))); }
+  function startFramesFor(startExposureMs, frameMs, intensity) {
+    const extra = intensity === 'hold' ? 2 : intensity === 'ease' ? 4 : 0;
+    return Math.min(maxFramesFor(frameMs), framesFor(startExposureMs, frameMs) + extra);
+  }
+  function makeStaircase(startFrames, maxFrames) {
+    return { frames: startFrames, maxFrames, streak: 0, lastDir: 0, reversals: [] };
+  }
+  /* Coarse steps far above threshold, single frames near it. */
+  function stepSize(frames) { return frames > 8 ? 2 : 1; }
+  /* 2-down / 1-up on frames. dir -1 = harder (shorter), +1 = easier. Mutates and returns s. */
+  function stairUpdate(s, correct) {
+    let dir;
+    if (correct) { s.streak++; if (s.streak < 2) return s; s.streak = 0; dir = -1; }
+    else { s.streak = 0; dir = 1; }
+    if (s.lastDir && dir !== s.lastDir) s.reversals.push(s.frames);
+    s.lastDir = dir;
+    s.frames = Math.max(1, Math.min(s.maxFrames, s.frames + dir * stepSize(s.frames)));
+    return s;
+  }
+  function thresholdFrames(s) {
+    if (!s.reversals.length) return s.frames;
+    const last = s.reversals.slice(-6);
+    return last.reduce((a, b) => a + b, 0) / last.length;
+  }
+  function shouldAdvance(s, stage) { return stage < 3 && s.reversals.length >= 4 && thresholdFrames(s) <= 3; }
+
+  const logic = { ECC, DISTRACTORS, medianOf, maxFramesFor, framesFor, startFramesFor, makeStaircase, stepSize, stairUpdate, thresholdFrames, shouldAdvance };
+
+  /* ---------- glyphs ---------- */
+  const SVG_TRI = '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,12 92,86 8,86" fill="currentColor"/></svg>';
+  const SVG_CIR = '<svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="currentColor"/></svg>';
+  const SVG_DIA = '<svg viewBox="0 0 100 100" aria-hidden="true"><polygon points="50,14 86,50 50,86 14,50" fill="none" stroke="currentColor" stroke-width="6"/></svg>';
+  const SVG_TICK = '<svg viewBox="0 0 100 100" aria-hidden="true"><polyline points="20,54 42,74 82,28" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const SVG_CROSS = '<svg viewBox="0 0 100 100" aria-hidden="true"><path d="M26 26 L74 74 M74 26 L26 74" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round"/></svg>';
+
+  /* spoke i: 0 = up, clockwise in 45° steps */
+  function spokeAngle(i) { return (-90 + i * 45) * Math.PI / 180; }
+
+  /* ---------- run ---------- */
+  async function run(container, options) {
+    const U = root.Scout.util;
+    const opt = Object.assign({ durationMs: 210000, startExposureMs: 250, stage: 1, intensity: 'push' }, options || {});
+    const signal = opt.signal;
+    const duration = opt.intensity === 'ease' ? opt.durationMs * 0.6 : opt.durationMs;
+    let stage = Math.max(1, Math.min(3, opt.stage | 0 || 1));
+
+    const cleanups = [];
+    let aborted = !!(signal && signal.aborted);
+    const abortWaiters = new Set();
+    const doAbort = () => { if (aborted) return; aborted = true; abortWaiters.forEach(f => f()); abortWaiters.clear(); };
+    if (signal) { signal.addEventListener('abort', doAbort); cleanups.push(() => signal.removeEventListener('abort', doAbort)); }
+
+    const timers = new Set();
+    let rafId = 0;
+    /* sleep that resolves early on abort */
+    const wait = ms => new Promise(res => {
+      if (aborted) return res();
+      const done = () => { clearTimeout(t); timers.delete(t); abortWaiters.delete(done); res(); };
+      const t = setTimeout(done, ms); timers.add(t); abortWaiters.add(done);
+    });
+    /* promise resolved by calling the returned setter, or by abort (with null) */
+    const answer = () => {
+      let resolve;
+      const p = new Promise(r => { resolve = r; });
+      const onAb = () => resolve(null);
+      abortWaiters.add(onAb);
+      p.finally(() => abortWaiters.delete(onAb));
+      if (aborted) resolve(null);
+      return { p, set: v => resolve(v) };
+    };
+    const on = (node, ev, fn, o) => { node.addEventListener(ev, fn, o); cleanups.push(() => node.removeEventListener(ev, fn, o)); };
+
+    /* DOM */
+    container.innerHTML = '';
+    const canvas = U.el('canvas', { class: 'wf-canvas' });
+    const hud = U.el('div', { class: 'wf-hud' });
+    const repLabel = U.el('span', { class: 'label wf-rep' });
+    const bar = U.el('div', { class: 'wf-bar' }, U.el('div', { class: 'wf-bar-fill' }));
+    hud.append(repLabel);
+    const endBtn = U.el('button', { class: 'btn btn-quiet wf-end', type: 'button', text: 'End' });
+    const layer = U.el('div', { class: 'wf-layer' });
+    container.append(canvas, bar, hud, layer, endBtn);
+    on(endBtn, 'click', () => { if (opt.onExit) opt.onExit(); doAbort(); });
+
+    let geo = U.fitCanvas(canvas);
+    let view = 'blank';
+    const C = {};
+    const readColors = () => { ['--stage-bg', '--stage-ink', '--ink', '--muted', '--signal'].forEach(k => { C[k] = U.cssVar(k); }); };
+    readColors();
+
+    const minDim = () => Math.min(geo.w, geo.h);
+    const centre = () => ({ x: geo.w / 2, y: geo.h / 2 });
+    const eccPx = st => ECC[st] * minDim() / 2;
+
+    function clear() { const c = geo.ctx; c.fillStyle = C['--stage-bg']; c.fillRect(0, 0, geo.w, geo.h); }
+    function drawCross() {
+      const c = geo.ctx, { x, y } = centre(), s = minDim() * 0.025;
+      c.strokeStyle = C['--muted']; c.lineWidth = Math.max(2, s * 0.22); c.lineCap = 'round';
+      c.beginPath(); c.moveTo(x - s, y); c.lineTo(x + s, y); c.moveTo(x, y - s); c.lineTo(x, y + s); c.stroke();
+    }
+    function paintView() { clear(); if (view === 'fix') drawCross(); }
+    function onResize() {
+      geo = U.fitCanvas(canvas); readColors(); paintView();
+      if (ringPlace) ringPlace();
+    }
+    on(window, 'resize', onResize);
+
+    /* scene */
+    function makeScene(st) {
+      const centreSym = Math.random() < 0.5 ? 'triangle' : 'circle';
+      const spoke = U.randInt(0, 7);
+      // distractor cells: 4 rings × 16 directions, excluding target's cell and its spoke-neighbour cell
+      const rings = [0.3, 0.55, 0.75, 0.95], cells = [];
+      const tRing = ECC[st];
+      rings.forEach(rf => { for (let d = 0; d < 16; d++) {
+        const ang = -90 + d * 22.5;
+        const near = Math.abs(rf - tRing) < 0.14 && Math.abs(U.angleDiff(ang, -90 + spoke * 45)) < 30;
+        if (!near) cells.push({ rf, ang });
+      } });
+      const n = DISTRACTORS[st] || 0;
+      const distractors = U.shuffle(cells).slice(0, n).map(c => ({
+        rf: c.rf + U.rand(-0.04, 0.04), ang: c.ang + U.rand(-6, 6),
+        kind: st >= 3 ? ['rot', 'half', 'square'][U.randInt(0, 2)] : 'square',
+        rot: U.rand(0, 360)
+      }));
+      return { centreSym, spoke, st, distractors };
+    }
+    function drawDiamond(c, x, y, s, fill) {
+      c.beginPath(); c.moveTo(x, y - s); c.lineTo(x + s, y); c.lineTo(x, y + s); c.lineTo(x - s, y); c.closePath();
+      c.fillStyle = fill; c.fill();
+    }
+    function drawScene(sc) {
+      clear();
+      const c = geo.ctx, { x, y } = centre(), md = minDim(), s = md * 0.05 / 2, half = md / 2;
+      c.save();
+      sc.distractors.forEach(d => {
+        const a = d.ang * Math.PI / 180, px = x + Math.cos(a) * d.rf * half, py = y + Math.sin(a) * d.rf * half;
+        const ds = s * 0.8;
+        c.save(); c.translate(px, py);
+        c.fillStyle = C['--muted']; c.strokeStyle = C['--muted']; c.lineWidth = Math.max(2, ds * 0.25);
+        if (d.kind === 'square') { c.fillRect(-ds * 0.7, -ds * 0.7, ds * 1.4, ds * 1.4); }
+        else if (d.kind === 'rot') { c.rotate((45 + U.rand(-15, 15)) * Math.PI / 180); c.strokeRect(-ds * 0.7, -ds * 0.7, ds * 1.4, ds * 1.4); }
+        else { c.rotate(d.rot * Math.PI / 180); c.beginPath(); c.moveTo(0, -ds); c.lineTo(ds, 0); c.lineTo(0, ds); c.closePath(); c.fill(); }
+        c.restore();
+      });
+      const a = spokeAngle(sc.spoke), r = eccPx(sc.st);
+      drawDiamond(c, x + Math.cos(a) * r, y + Math.sin(a) * r, s * 1.15, C['--signal']);
+      c.fillStyle = C['--stage-ink'];
+      if (sc.centreSym === 'circle') { c.beginPath(); c.arc(x, y, s * 0.9, 0, Math.PI * 2); c.fill(); }
+      else { c.beginPath(); c.moveTo(x, y - s); c.lineTo(x + s * 1.05, y + s * 0.8); c.lineTo(x - s * 1.05, y + s * 0.8); c.closePath(); c.fill(); }
+      c.restore();
+    }
+    /* noise mask, pre-rendered off-screen at device resolution */
+    let maskCanvas = null;
+    function prepareMask() {
+      const off = maskCanvas || document.createElement('canvas');
+      off.width = canvas.width; off.height = canvas.height;
+      const c = off.getContext('2d');
+      c.setTransform(geo.dpr, 0, 0, geo.dpr, 0, 0);
+      c.globalAlpha = 1; c.fillStyle = C['--stage-bg']; c.fillRect(0, 0, geo.w, geo.h);
+      const n = Math.round(geo.w * geo.h / 220), cols = [C['--ink'], C['--muted']];
+      c.lineCap = 'round';
+      for (let i = 0; i < n; i++) {
+        c.globalAlpha = U.rand(0.2, 0.85);
+        const x = Math.random() * geo.w, y = Math.random() * geo.h, col = cols[i & 1];
+        if (Math.random() < 0.55) { c.fillStyle = col; c.fillRect(x, y, U.rand(3, 14), U.rand(3, 14)); }
+        else {
+          const a = Math.random() * Math.PI, l = U.rand(6, 22);
+          c.strokeStyle = col; c.lineWidth = U.rand(1.5, 4);
+          c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke();
+        }
+      }
+      c.globalAlpha = 1;
+      maskCanvas = off;
+    }
+    function drawMask() {
+      const c = geo.ctx;
+      c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(maskCanvas, 0, 0); c.restore();
+    }
+    /* flash for exactly `frames` refreshes: scene on rAF k, mask on rAF k+frames */
+    function present(sc, frames) {
+      return new Promise(resolve => {
+        let t0 = 0, count = -1;
+        const onAb = () => { cancelAnimationFrame(rafId); resolve(null); };
+        abortWaiters.add(onAb);
+        const tick = ts => {
+          if (count < 0) { drawScene(sc); t0 = ts; count = 0; rafId = requestAnimationFrame(tick); return; }
+          count++;
+          if (count >= frames) { drawMask(); abortWaiters.delete(onAb); resolve(ts - t0); return; }
+          rafId = requestAnimationFrame(tick);
+        };
+        rafId = requestAnimationFrame(tick);
+      });
+    }
+    async function estimateFrameMs() {
+      const ts = [];
+      for (let i = 0; i < 31 && !aborted; i++) ts.push(await new Promise(r => { rafId = requestAnimationFrame(r); }));
+      const d = []; for (let i = 1; i < ts.length; i++) d.push(ts[i] - ts[i - 1]);
+      const m = medianOf(d);
+      return Number.isFinite(m) ? Math.max(4, Math.min(50, m)) : 1000 / 60;
+    }
+
+    /* answer UI */
+    let ringPlace = null;
+    function askCentre() {
+      const a = answer();
+      const pick = v => e => { e.preventDefault(); a.set(v); };
+      const tri = U.el('button', { class: 'btn wf-sym', type: 'button', 'aria-label': 'Triangle', html: SVG_TRI });
+      const cir = U.el('button', { class: 'btn wf-sym', type: 'button', 'aria-label': 'Circle', html: SVG_CIR });
+      tri.addEventListener('pointerdown', pick('triangle'));
+      cir.addEventListener('pointerdown', pick('circle'));
+      layer.replaceChildren(U.el('div', { class: 'wf-ask' }, [
+        U.el('p', { class: 'h-2 wf-q', text: 'What was in the centre?' }),
+        U.el('div', { class: 'wf-syms' }, [tri, cir])
+      ]));
+      return a.p;
+    }
+    function askSpoke(st) {
+      const a = answer();
+      const ring = U.el('div', { class: 'wf-ring' });
+      const markers = [];
+      for (let i = 0; i < 8; i++) {
+        const m = U.el('div', { class: 'wf-spoke', html: SVG_DIA, 'aria-hidden': 'true' });
+        markers.push(m); ring.appendChild(m);
+      }
+      const q = U.el('p', { class: 'wf-q wf-q-ring', text: 'Where was the diamond?' });
+      ring.appendChild(q);
+      ringPlace = () => {
+        const { x, y } = centre(), r = eccPx(st);
+        const spacing = 2 * r * Math.sin(Math.PI / 8);
+        const size = Math.max(56, Math.min(120, spacing * 0.72, 2 * (minDim() / 2 - r)));
+        markers.forEach((m, i) => {
+          const ang = spokeAngle(i);
+          m.style.width = m.style.height = size + 'px';
+          m.style.left = (x + Math.cos(ang) * r - size / 2) + 'px';
+          m.style.top = (y + Math.sin(ang) * r - size / 2) + 'px';
+        });
+      };
+      ringPlace();
+      /* wedge hit-areas: any tap outside the inner zone counts for the nearest spoke */
+      ring.addEventListener('pointerdown', e => {
+        const rect = ring.getBoundingClientRect();
+        const dx = e.clientX - rect.left - geo.w / 2, dy = e.clientY - rect.top - geo.h / 2;
+        if (Math.hypot(dx, dy) < eccPx(st) * 0.3) return;
+        e.preventDefault();
+        const deg = Math.atan2(dy, dx) * 180 / Math.PI + 90;
+        const i = ((Math.round(deg / 45) % 8) + 8) % 8;
+        markers[i].classList.add('wf-spoke-hit');
+        a.set(i);
+      });
+      layer.replaceChildren(ring);
+      return a.p.finally(() => { ringPlace = null; });
+    }
+    async function feedback(ok) {
+      layer.replaceChildren(U.el('div', { class: 'wf-fb ' + (ok ? 'wf-fb-ok' : 'wf-fb-no'), html: ok ? SVG_TICK : SVG_CROSS, role: 'status', 'aria-label': ok ? 'Correct' : 'Not quite' }));
+      await wait(400);
+      layer.replaceChildren();
+    }
+
+    /* instruction screen */
+    async function intro() {
+      const a = answer();
+      const start = U.el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Start' });
+      start.addEventListener('click', () => a.set(true));
+      layer.replaceChildren(U.el('div', { class: 'wf-intro' }, U.el('div', { class: 'card wf-card' }, [
+        U.el('div', { class: 'spread' }, [U.el('h1', { class: 'h-display', text: 'Wide Field' }), U.el('span', { class: 'label', text: 'Stage ' + stage + ' of 3' })]),
+        U.el('div', { class: 'prose wf-prose' }, [
+          U.el('p', { text: 'Keep your eyes on the centre cross and let the edge come to you.' }),
+          U.el('p', { text: 'A scene flashes briefly, then you say what was in the centre and where the diamond was.' }),
+          U.el('p', { text: 'The flash gets shorter as you improve, so aim to feel just at your limit.' }),
+          U.el('p', { class: 'muted', text: 'Hold the tablet a little closer than usual.' })
+        ]),
+        start
+      ])));
+      hud.hidden = true; bar.hidden = true;
+      await a.p;
+      layer.replaceChildren();
+      hud.hidden = false; bar.hidden = false;
+    }
+
+    /* ---- session ---- */
+    const trials = [];
+    let frameMs = 1000 / 60, stair = null, tStart = 0;
+    const result = () => {
+      const n = trials.length, nc = trials.filter(t => t.correct).length;
+      const thr = stair ? thresholdFrames(stair) * frameMs : NaN;
+      const out = {
+        trials, n, accuracy: n ? nc / n : NaN,
+        thresholdMs: Number.isFinite(thr) ? Math.round(thr * 10) / 10 : null,
+        finalExposureMs: stair ? Math.round(stair.frames * frameMs * 10) / 10 : null,
+        frameMs: Math.round(frameMs * 100) / 100, stage
+      };
+      if (aborted) out.aborted = true;
+      return out;
+    };
+
+    try {
+      if (!aborted) await intro();
+      if (!aborted) {
+        view = 'fix'; paintView();
+        frameMs = await estimateFrameMs();
+        stair = makeStaircase(startFramesFor(opt.startExposureMs, frameMs, opt.intensity), maxFramesFor(frameMs));
+        tStart = performance.now();
+        const fill = bar.firstChild;
+        const barTick = () => {
+          const left = Math.max(0, 1 - (performance.now() - tStart) / duration);
+          fill.style.transform = 'scaleX(' + left + ')';
+        };
+        const barTimer = setInterval(barTick, 500); cleanups.push(() => clearInterval(barTimer)); barTick();
+
+        while (!aborted && performance.now() - tStart < duration) {
+          repLabel.textContent = 'Rep ' + (trials.length + 1) + ' · Stage ' + stage;
+          const sc = makeScene(stage);
+          view = 'fix'; readColors(); paintView();
+          prepareMask();
+          await wait(U.rand(600, 1000));
+          if (aborted) break;
+          const frames = stair.frames;
+          view = 'flash';
+          const exposure = await present(sc, frames);
+          if (aborted || exposure == null) break;
+          view = 'mask';
+          await wait(250);
+          if (aborted) break;
+          view = 'blank'; paintView();
+          const centreAns = await askCentre();
+          if (aborted || centreAns == null) break;
+          const spokeAns = await askSpoke(stage);
+          if (aborted || spokeAns == null) break;
+          const correct = centreAns === sc.centreSym && spokeAns === sc.spoke;
+          trials.push({ stage, frames, exposureMs: Math.round(exposure * 10) / 10, centre: sc.centreSym, centreAns, spoke: sc.spoke, spokeAns, correct, t: Math.round(performance.now() - tStart) });
+          stairUpdate(stair, correct);
+          await feedback(correct);
+          if (shouldAdvance(stair, stage)) {
+            stage++;
+            stair = makeStaircase(framesFor(opt.startExposureMs, frameMs), maxFramesFor(frameMs));
+          }
+        }
+      }
+    } finally {
+      cancelAnimationFrame(rafId);
+      timers.forEach(t => clearTimeout(t)); timers.clear();
+      cleanups.forEach(f => f());
+      abortWaiters.clear();
+    }
+    return result();
+  }
+
+  root.Scout = root.Scout || { modules: {} };
+  root.Scout.modules = root.Scout.modules || {};
+  root.Scout.modules.widefield = { run, _logic: logic };
+})();
+
+;
+/* First Light — Dead Reckoning (path integration) training module. */
+(function () {
+  'use strict';
+  const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+
+  /* ------------------------------------------------------------------ */
+  /* Pure geometry. Compass convention: 0° = north (world +y / screen up),
+     clockwise positive. World x = east, y = north. Screen y grows down.   */
+  /* ------------------------------------------------------------------ */
+  const LEVELS = {
+    1: { name: 'Two legs, square turns', legs: [2, 2], turns: [90], ego: false, speedVary: false, fade: true },
+    2: { name: 'Three legs, no trail', legs: [3, 3], turns: [90], ego: false, speedVary: false, fade: false },
+    3: { name: 'Angled turns', legs: [3, 4], turns: [45, 90, 135], ego: false, speedVary: false, fade: false },
+    4: { name: 'Heading-up view', legs: [3, 4], turns: [45, 90, 135], ego: true, speedVary: false, fade: false },
+    5: { name: 'Changing pace', legs: [3, 4], turns: [45, 90, 135], ego: true, speedVary: true, fade: false },
+    6: { name: 'Long walk', legs: [5, 6], turns: null, ego: true, speedVary: false, fade: false }
+  };
+  const CARDS = {
+    1: ['One home arrow', 'Picture a single arrow from the walker back to the start. That arrow is the only thing worth carrying.', 'Grow it as the walker moves; you do not need to remember the legs themselves.'],
+    2: ['Update, then forget', 'At every turn, fold the leg you just walked into the home arrow.', 'Then let that leg go — the arrow already holds it. The trail will vanish to help you practise this.'],
+    3: ['Clock-face bearings', 'Name home as a clock hour: “home is at 7 o’clock.”', 'After each turn, shift the hour by the turn: 90° is 3 hours, 45° is 1½, 135° is 4½.'],
+    4: ['Turn with the world', 'Now ahead is always up, and the world turns around the walker.', 'When the walker turns right, home swings left by the same amount. Pin the arrow to the ground, not to the screen.'],
+    5: ['Pace × time', 'The pace changes from leg to leg. Watch the footprint spacing and feel the duration.', 'A short, fast leg can cover as much ground as a long, slow one: distance = pace × time.'],
+    6: ['Trust the arrow', 'Too many legs to remember — and you don’t need to.', 'Update the arrow at each turn, forget the leg, and commit to the arrow at the end.']
+  };
+
+  const norm360 = a => ((a % 360) + 360) % 360;
+  const adiff = (a, b) => { const d = ((a - b) % 360 + 540) % 360 - 180; return d === -180 ? 180 : d; };
+  const bearing = (dx, dy) => norm360(Math.atan2(dx, dy) * R2D);
+
+  /* Points visited when walking legs [{len, turn}] from origin with initial heading h0 (turns scaled by k). */
+  function walk(h0, legs, k) {
+    k = k == null ? 1 : k;
+    const pts = [{ x: 0, y: 0 }];
+    let h = h0, x = 0, y = 0;
+    legs.forEach((l, i) => {
+      if (i > 0) h += l.turn * k;
+      x += l.len * Math.sin(h * D2R); y += l.len * Math.cos(h * D2R);
+      pts.push({ x, y });
+    });
+    return pts;
+  }
+  /* Vector from the final point back to the first: compass bearing + distance. */
+  function homeVector(points) {
+    const a = points[0], e = points[points.length - 1];
+    const dx = a.x - e.x, dy = a.y - e.y;
+    return { angle: bearing(dx, dy), dist: Math.hypot(dx, dy) };
+  }
+  /* Screen drag (dx right, dy down) -> screen-relative compass angle (up = 0). */
+  const screenAngle = (dx, dy) => bearing(dx, -dy);
+  /* Egocentric (relative to walker's heading, which faces up) <-> world compass. */
+  const egoToWorld = (ego, heading) => norm360(ego + heading);
+  const worldToEgo = (world, heading) => norm360(world - heading);
+
+  /* Camera: {x, y, rot (compass deg that maps to screen up), s (px/unit), cx, cy}. */
+  function toScreen(cam, p) {
+    const c = cam.rot * D2R, x = p.x - cam.x, y = p.y - cam.y;
+    const xr = x * Math.cos(c) - y * Math.sin(c), yr = x * Math.sin(c) + y * Math.cos(c);
+    return { x: cam.cx + xr * cam.s, y: cam.cy - yr * cam.s };
+  }
+  function toWorld(cam, q) {
+    const c = cam.rot * D2R, xr = (q.x - cam.cx) / cam.s, yr = -(q.y - cam.cy) / cam.s;
+    return { x: cam.x + xr * Math.cos(c) + yr * Math.sin(c), y: cam.y - xr * Math.sin(c) + yr * Math.cos(c) };
+  }
+
+  function score(trueAngle, trueDist, guessAngle, guessDist) {
+    const signed = adiff(guessAngle, trueAngle);
+    return { angErrSigned: signed, angErr: Math.abs(signed), distErrPct: trueDist > 0 ? (guessDist - trueDist) / trueDist * 100 : 0 };
+  }
+
+  /* view: {w, h} usable size in world units (fixed camera) and/or {maxHome} (following camera). */
+  function genRoute(level, view, rng) {
+    rng = rng || Math.random;
+    const cfg = LEVELS[level] || LEVELS[1];
+    const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+    let route = null;
+    for (let attempt = 0; attempt < 600; attempt++) {
+      const n = ri(cfg.legs[0], cfg.legs[1]);
+      const step = cfg.ego ? 0 : cfg.turns.indexOf(45) >= 0 ? 45 : 90;
+      const h0 = step ? ri(0, 360 / step - 1) * step : Math.floor(rng() * 360);
+      const legs = [];
+      for (let i = 0; i < n; i++) {
+        const mag = cfg.turns ? cfg.turns[ri(0, cfg.turns.length - 1)] : Math.round(20 + rng() * 140);
+        legs.push({
+          len: Math.round((1 + rng() * 2) * 100) / 100,
+          turn: i === 0 ? 0 : (rng() < 0.5 ? -1 : 1) * mag,
+          speed: cfg.speedVary ? Math.round((0.6 + rng()) * 100) / 100 : 1
+        });
+      }
+      const points = walk(h0, legs);
+      let h = h0; legs.forEach(l => { h += l.turn; l.heading = h; });
+      const home = homeVector(points);
+      route = { level, h0, legs, points, finalHeading: norm360(h), home };
+      if (home.dist < 0.8) continue;
+      if (view && view.maxHome && home.dist > view.maxHome) continue;
+      if (view && view.w) {
+        const xs = points.map(p => p.x), ys = points.map(p => p.y), m = 0.6;
+        if (Math.max(...xs) - Math.min(...xs) + 2 * m > view.w || Math.max(...ys) - Math.min(...ys) + 2 * m > view.h) continue;
+      }
+      return route;
+    }
+    return route;
+  }
+
+  function coach(route, guessAngle, sc) {
+    const a = sc.angErr, d = sc.distErrPct;
+    if (a < 10) {
+      if (d < -20) return 'Direction spot on — but you underestimated how far you went.';
+      if (d > 20) return 'Direction spot on — but you overestimated how far you went.';
+      return 'Clean. The arrow held all the way home.';
+    }
+    if (route.legs.length > 1) {
+      const sharp = homeVector(walk(route.h0, route.legs, 1.35)).angle;
+      const soft = homeVector(walk(route.h0, route.legs, 0.65)).angle;
+      const eS = Math.abs(adiff(guessAngle, sharp)), eF = Math.abs(adiff(guessAngle, soft));
+      if (Math.min(eS, eF) < a * 0.6) return eS < eF
+        ? 'Your turns felt sharper than they were — give each turn its exact size, no more.'
+        : 'Your turns felt softer than they were — give each turn its full size.';
+    }
+    if (d < -20) return 'You underestimated how far you went — legs add up faster than they feel.';
+    if (d > 20) return 'You overestimated how far you went — the route doubles back more than it feels.';
+    return 'Off by ' + Math.round(a) + '°. Update the arrow at each turn, then forget the leg.';
+  }
+
+  const geo = { LEVELS, norm360, adiff, bearing, walk, homeVector, screenAngle, egoToWorld, worldToEgo, toScreen, toWorld, score, genRoute, coach };
+
+  /* ------------------------------------------------------------------ */
+  /* Runtime                                                             */
+  /* ------------------------------------------------------------------ */
+  const WALK_SPEED = 1.2;   // world units / s at speed 1
+  const STEP_HZ = 2.2;      // steps / s (constant, so stride ∝ speed)
+  const TURN_MS = 420;
+
+  function buildTimeline(route) {
+    const segs = []; let t = 900;
+    route.legs.forEach((l, i) => {
+      const hPrev = i === 0 ? route.h0 : route.legs[i - 1].heading;
+      if (i > 0) { segs.push({ type: 'turn', t0: t, dur: TURN_MS, h0: hPrev, h1: l.heading, leg: i }); t += TURN_MS + 140; }
+      const dur = l.len / (WALK_SPEED * l.speed) * 1000;
+      segs.push({ type: 'walk', t0: t, dur, leg: i, from: route.points[i], to: route.points[i + 1], heading: l.heading, speed: l.speed });
+      t += dur;
+    });
+    return { segs, end: t + 350, legEnd: segs.filter(s => s.type === 'walk').map(s => s.t0 + s.dur) };
+  }
+  function stateAt(tl, route, t) {
+    let st = { pos: route.points[0], heading: route.h0, leg: 0, frac: 0, walking: false };
+    for (const s of tl.segs) {
+      if (t < s.t0) break;
+      const f = Math.min(1, (t - s.t0) / s.dur);
+      if (s.type === 'turn') {
+        const e = f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2;
+        st = { pos: route.points[s.leg], heading: s.h0 + (s.h1 - s.h0) * e, leg: s.leg, frac: 0, walking: false };
+      } else {
+        st = { pos: { x: s.from.x + (s.to.x - s.from.x) * f, y: s.from.y + (s.to.y - s.from.y) * f }, heading: s.heading, leg: s.leg, frac: f, walking: f < 1, speed: s.speed, tw: t - s.t0 };
+      }
+    }
+    return st;
+  }
+
+  function run(container, options) {
+    const U = window.Scout.util, St = window.Scout.stats, el = U.el;
+    options = options || {};
+    const signal = options.signal;
+    const intensity = options.intensity || 'hold';
+    const durationMs = (options.durationMs || 210000) * (intensity === 'ease' ? 0.6 : 1);
+    const startLevel = U.clamp(Math.round(options.level || 1), 1, 6);
+    let level = startLevel;
+    const seen = new Set(options.seenCards || []);
+    const reps = [];
+    let streak = [];
+    let sessionT0 = null, pal = {}, raf = 0, timers = [], finished = false;
+
+    return new Promise(resolve => {
+      const ABORT = { abort: true };
+      let abortResolve; const abortP = new Promise(r => { abortResolve = r; });
+      const onAbort = () => abortResolve(ABORT);
+      if (signal) { if (signal.aborted) queueMicrotask(onAbort); else signal.addEventListener('abort', onAbort); }
+      const wait = p => Promise.race([p, abortP]);
+      const clicked = btn => wait(new Promise(r => btn.addEventListener('click', r, { once: true })));
+
+      /* DOM */
+      const canvas = el('canvas', { class: 'dr-canvas' });
+      const badge = el('span', { class: 'dr-badge num' });
+      const repLbl = el('span', { class: 'dr-reps label' });
+      const endBtn = el('button', { class: 'btn btn-quiet dr-end', type: 'button', text: 'End' });
+      const timeFill = el('div', { class: 'dr-timefill' });
+      const hint = el('div', { class: 'dr-hint', hidden: true });
+      const lockBtn = el('button', { class: 'btn btn-primary btn-big dr-lock', type: 'button', text: 'Lock it in', disabled: true, hidden: true });
+      const overlay = el('div', { class: 'dr-overlay', hidden: true });
+      const toast = el('div', { class: 'dr-toast', hidden: true });
+      const root = el('div', { class: 'dr-root' }, [canvas,
+        el('div', { class: 'dr-timebar' }, timeFill),
+        el('div', { class: 'dr-hud' }, [el('div', { class: 'dr-hud-left' }, [badge, repLbl]), endBtn]),
+        hint, lockBtn, overlay, toast]);
+      container.appendChild(root);
+
+      let view = { ctx: null, w: 0, h: 0 };
+      const readPal = () => { ['--line', '--muted', '--accent', '--signal', '--good', '--ink', '--surface', '--stage-bg'].forEach(k => { pal[k] = U.cssVar(k); }); };
+      const refit = () => { view = U.fitCanvas(canvas); readPal(); };
+      const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+      window.addEventListener('resize', refit);
+      if (mq && mq.addEventListener) mq.addEventListener('change', readPal);
+      refit();
+
+      endBtn.addEventListener('click', () => { if (options.onExit) options.onExit(); if (!signal) onAbort(); });
+      const updateHud = () => { badge.textContent = 'L' + level; repLbl.textContent = 'Rep ' + (reps.length + 1); };
+
+      /* ---- rendering state ---- */
+      let scene = { mode: 'idle' };
+      const HUD_TOP = 64, BOTTOM = 100;
+
+      function camFor(route, st) {
+        const { w, h } = view, cfg = LEVELS[route.level];
+        if (cfg.ego) {
+          const s = (Math.min(w, h) / 2 - 80) / 7;
+          return { x: st.pos.x, y: st.pos.y, rot: st.heading, s: Math.max(18, s), cx: w / 2, cy: h / 2 };
+        }
+        return Object.assign({ rot: 0 }, route.fixedCam);
+      }
+      function fixedCamera(points) {
+        const { w, h } = view, uh = h - HUD_TOP - BOTTOM, s = Math.min(w, uh) / 9;
+        const xs = points.map(p => p.x), ys = points.map(p => p.y);
+        return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, s, cx: w / 2, cy: HUD_TOP + uh / 2 };
+      }
+
+      function hash(i, j) { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); }
+      function drawGround(ctx, cam) {
+        const sp = 0.5, R = Math.hypot(view.w, view.h) / 2 / cam.s + 1;
+        const c = toWorld(cam, { x: view.w / 2, y: view.h / 2 });
+        ctx.fillStyle = pal['--line']; ctx.beginPath();
+        for (let i = Math.floor((c.x - R) / sp); i <= Math.ceil((c.x + R) / sp); i++) {
+          for (let j = Math.floor((c.y - R) / sp); j <= Math.ceil((c.y + R) / sp); j++) {
+            const q = toScreen(cam, { x: (i + 0.15 + 0.7 * hash(i, j)) * sp, y: (j + 0.15 + 0.7 * hash(j, i + 7)) * sp });
+            if (q.x < -4 || q.y < -4 || q.x > view.w + 4 || q.y > view.h + 4) continue;
+            ctx.moveTo(q.x + 1.7, q.y); ctx.arc(q.x, q.y, 1.7, 0, Math.PI * 2);
+          }
+        }
+        ctx.fill();
+      }
+      function drawHouse(ctx, q, size, alpha) {
+        ctx.save(); ctx.globalAlpha = alpha; ctx.translate(q.x, q.y);
+        ctx.strokeStyle = pal['--ink']; ctx.fillStyle = pal['--surface']; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+        const s = size;
+        ctx.beginPath(); ctx.moveTo(-s, s * 0.9); ctx.lineTo(-s, -s * 0.1); ctx.lineTo(0, -s); ctx.lineTo(s, -s * 0.1); ctx.lineTo(s, s * 0.9); ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.rect(-s * 0.28, s * 0.3, s * 0.56, s * 0.6); ctx.stroke();
+        ctx.restore();
+      }
+      function drawWalker(ctx, q, screenHeading, scale) {
+        ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(screenHeading * D2R); ctx.scale(scale, scale);
+        ctx.fillStyle = pal['--accent']; ctx.strokeStyle = pal['--stage-bg']; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(11, 11); ctx.lineTo(0, 5); ctx.lineTo(-11, 11); ctx.closePath();
+        ctx.stroke(); ctx.fill(); ctx.restore();
+      }
+      function drawLegTrail(ctx, cam, route, legIdx, frac, alpha) {
+        if (alpha <= 0 || frac <= 0) return;
+        const a = route.points[legIdx], b = route.points[legIdx + 1], l = route.legs[legIdx];
+        const len = l.len * frac, ux = (b.x - a.x) / l.len, uy = (b.y - a.y) / l.len;
+        ctx.save(); ctx.globalAlpha = alpha * 0.35; ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2;
+        const qa = toScreen(cam, a), qb = toScreen(cam, { x: a.x + ux * len, y: a.y + uy * len });
+        ctx.beginPath(); ctx.moveTo(qa.x, qa.y); ctx.lineTo(qb.x, qb.y); ctx.stroke();
+        ctx.globalAlpha = alpha * 0.7; ctx.fillStyle = pal['--muted'];
+        const stride = WALK_SPEED * l.speed / STEP_HZ, off = 0.07;
+        let k = 0;
+        for (let d = stride / 2; d <= len; d += stride, k++) {
+          const side = k % 2 ? 1 : -1;
+          const q = toScreen(cam, { x: a.x + ux * d + uy * off * side, y: a.y + uy * d - ux * off * side });
+          ctx.beginPath(); ctx.arc(q.x, q.y, 2.6, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+      function drawCompass(ctx, rot) {
+        const cx = 54 + 10, cy = view.h - 64, r = 30;
+        ctx.save(); ctx.translate(cx, cy);
+        ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.rotate(-rot * D2R);
+        ctx.fillStyle = pal['--ink']; ctx.beginPath(); ctx.moveTo(0, -r + 2); ctx.lineTo(6, -6); ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal['--muted']; ctx.beginPath(); ctx.moveTo(0, r - 2); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+        ctx.translate(0, -r - 12); ctx.rotate(rot * D2R);
+        ctx.fillStyle = pal['--ink']; ctx.font = '600 13px ' + U.cssVar('--font-mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('N', 0, 0); ctx.restore();
+      }
+      function drawGuess(ctx, from, to) {
+        ctx.save(); ctx.strokeStyle = pal['--signal']; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+        ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(to.x, to.y, 12, 0, Math.PI * 2);
+        ctx.moveTo(to.x - 20, to.y); ctx.lineTo(to.x - 6, to.y); ctx.moveTo(to.x + 6, to.y); ctx.lineTo(to.x + 20, to.y);
+        ctx.moveTo(to.x, to.y - 20); ctx.lineTo(to.x, to.y - 6); ctx.moveTo(to.x, to.y + 6); ctx.lineTo(to.x, to.y + 20);
+        ctx.stroke(); ctx.restore();
+      }
+
+      function frame(now) {
+        raf = requestAnimationFrame(frame);
+        const { ctx, w, h } = view; if (!ctx) return;
+        ctx.clearRect(0, 0, w, h);
+        if (sessionT0 != null) timeFill.style.transform = 'scaleX(' + Math.max(0, 1 - (now - sessionT0) / durationMs) + ')';
+        const sc = scene;
+        if (sc.mode === 'idle') { drawGround(ctx, { x: 0, y: 0, rot: 0, s: Math.min(w, h) / 9, cx: w / 2, cy: h / 2 }); return; }
+        const route = sc.route, cfg = LEVELS[route.level];
+        if (sc.mode === 'walk' || sc.mode === 'answer') {
+          const t = sc.mode === 'walk' ? now - sc.t0 : sc.tl.end;
+          const st = stateAt(sc.tl, route, t);
+          if (sc.mode === 'answer') st.heading = route.legs[route.legs.length - 1].heading;
+          const cam = camFor(route, st); sc.cam = cam;
+          drawGround(ctx, cam);
+          if (sc.mode === 'walk') {
+            if (cfg.fade) for (let i = 0; i < st.leg; i++) drawLegTrail(ctx, cam, route, i, 1, 1 - (t - sc.tl.legEnd[i]) / 2000);
+            drawLegTrail(ctx, cam, route, st.leg, st.frac, 1);
+            const leg0End = sc.tl.legEnd[0], leg0Start = sc.tl.segs[0].t0;
+            const hA = t < leg0Start ? 1 : Math.max(0, 1 - (t - leg0Start) / (leg0End - leg0Start));
+            if (hA > 0) drawHouse(ctx, toScreen(cam, route.points[0]), 13, hA);
+          }
+          const q = toScreen(cam, st.pos);
+          const bob = st.walking ? Math.abs(Math.sin((st.tw / 1000) * STEP_HZ * Math.PI)) : 0;
+          drawWalker(ctx, q, st.heading - cam.rot, 1 + bob * 0.1);
+          if (cfg.ego) drawCompass(ctx, cam.rot);
+          if (sc.mode === 'answer' && sc.guess) drawGuess(ctx, q, sc.guess);
+          sc.walkerScreen = q;
+          if (sc.mode === 'walk' && t >= sc.tl.end && sc.done) { const d = sc.done; sc.done = null; d(); }
+          return;
+        }
+        if (sc.mode === 'feedback') drawFeedback(ctx, sc);
+      }
+
+      function drawFeedback(ctx, sc) {
+        const { w, h } = view, route = sc.route, pts = route.points, end = pts[pts.length - 1];
+        const all = pts.concat([sc.guessWorld]);
+        const landscape = w >= h;
+        const box = landscape ? { x0: 24, y0: HUD_TOP, x1: w - Math.min(400, w * 0.42), y1: h - 24 } : { x0: 24, y0: HUD_TOP, x1: w - 24, y1: h - 300 };
+        const xs = all.map(p => p.x), ys = all.map(p => p.y);
+        const bw = Math.max(1, Math.max(...xs) - Math.min(...xs)), bh = Math.max(1, Math.max(...ys) - Math.min(...ys));
+        const s = Math.min((box.x1 - box.x0 - 80) / bw, (box.y1 - box.y0 - 80) / bh, 120);
+        const cam = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, rot: 0, s, cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2 };
+        drawGround(ctx, cam);
+        const P = pts.map(p => toScreen(cam, p));
+        ctx.save(); ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
+        ctx.beginPath(); P.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
+        const qe = P[P.length - 1], qs = P[0], qg = toScreen(cam, sc.guessWorld);
+        ctx.strokeStyle = pal['--good']; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(qe.x, qe.y); ctx.lineTo(qs.x, qs.y); ctx.stroke();
+        ctx.restore();
+        drawGuess(ctx, qe, qg);
+        ctx.save(); ctx.font = '600 13px ' + U.cssVar('--font-mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (let i = 1; i < P.length - 1; i++) {
+          ctx.fillStyle = pal['--surface']; ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 1.5;
+          ctx.beginPath(); ctx.arc(P[i].x, P[i].y, 12, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+          ctx.fillStyle = pal['--ink']; ctx.fillText(String(i), P[i].x, P[i].y + 0.5);
+        }
+        ctx.restore();
+        drawHouse(ctx, qs, 13, 1);
+        drawWalker(ctx, qe, route.legs[route.legs.length - 1].heading, 0.9);
+      }
+      raf = requestAnimationFrame(frame);
+
+      /* ---- overlays ---- */
+      function showOverlay(panel, cls) {
+        overlay.replaceChildren(panel); overlay.className = 'dr-overlay' + (cls ? ' ' + cls : ''); overlay.hidden = false;
+      }
+      const hideOverlay = () => { overlay.hidden = true; overlay.replaceChildren(); };
+      function showToast(text) {
+        toast.textContent = text; toast.hidden = false;
+        timers.push(setTimeout(() => { toast.hidden = true; }, 1800));
+      }
+
+      async function instructions() {
+        const cfg = LEVELS[level];
+        const btn = el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Start' });
+        showOverlay(el('div', { class: 'card dr-panel' }, [
+          el('div', { class: 'label', text: 'Level ' + level + ' · ' + cfg.name }),
+          el('h1', { class: 'h-display', text: 'Dead Reckoning' }),
+          el('p', { class: 'prose', text: 'Watch the walker as it walks a route, one leg at a time. The start marker disappears after the first steps, so keep track of where home is as you go.' + (cfg.ego ? ' The view turns with the walker: ahead is always up.' : '') }),
+          el('p', { class: 'prose', text: 'At the end, drag from the walker back toward the start. The direction is your aim; the length of the line is how far.' }),
+          btn]));
+        btn.focus();
+        return clicked(btn);
+      }
+      async function techniqueCard() {
+        if (seen.has(level)) return true;
+        const c = CARDS[level];
+        const btn = el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Got it' });
+        showOverlay(el('div', { class: 'card dr-panel' }, [
+          el('div', { class: 'label', text: 'Technique · Level ' + level }),
+          el('h2', { class: 'h-2', text: c[0] }),
+          el('p', { class: 'prose', text: c[1] }), el('p', { class: 'prose', text: c[2] }), btn]));
+        btn.focus();
+        const r = await clicked(btn);
+        if (r !== ABORT) seen.add(level);
+        hideOverlay();
+        return r;
+      }
+
+      async function doRep() {
+        const cfg = LEVELS[level];
+        readPal();
+        let route;
+        if (cfg.ego) route = genRoute(level, { maxHome: 6.3 });
+        else {
+          const uh = view.h - HUD_TOP - BOTTOM, s = Math.min(view.w, uh) / 9;
+          route = genRoute(level, { w: view.w / s, h: uh / s });
+          route.fixedCam = fixedCamera(route.points);
+        }
+        const tl = buildTimeline(route);
+        const walked = new Promise(r => { scene = { mode: 'walk', route, tl, t0: performance.now(), done: r }; });
+        if ((await wait(walked)) === ABORT) return ABORT;
+
+        /* answer */
+        scene.mode = 'answer'; scene.guess = null;
+        hint.textContent = 'Drag from the walker toward the start'; hint.hidden = false;
+        lockBtn.hidden = false; lockBtn.disabled = true;
+        let dragging = false;
+        const setGuess = e => {
+          const r = canvas.getBoundingClientRect();
+          scene.guess = { x: U.clamp(e.clientX - r.left, 0, view.w), y: U.clamp(e.clientY - r.top, 0, view.h) };
+          lockBtn.disabled = false;
+        };
+        const pd = e => { dragging = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} setGuess(e); };
+        const pm = e => { if (dragging) setGuess(e); };
+        const pu = () => { dragging = false; };
+        canvas.addEventListener('pointerdown', pd); canvas.addEventListener('pointermove', pm);
+        canvas.addEventListener('pointerup', pu); canvas.addEventListener('pointercancel', pu);
+        const r = await clicked(lockBtn);
+        canvas.removeEventListener('pointerdown', pd); canvas.removeEventListener('pointermove', pm);
+        canvas.removeEventListener('pointerup', pu); canvas.removeEventListener('pointercancel', pu);
+        hint.hidden = true; lockBtn.hidden = true;
+        if (r === ABORT) return ABORT;
+
+        const cam = scene.cam, ws = scene.walkerScreen, g = scene.guess;
+        const sAng = screenAngle(g.x - ws.x, g.y - ws.y);
+        const guessAngle = cfg.ego ? egoToWorld(sAng, route.finalHeading) : norm360(sAng + cam.rot);
+        const guessDist = Math.hypot(g.x - ws.x, g.y - ws.y) / cam.s;
+        const sc = score(route.home.angle, route.home.dist, guessAngle, guessDist);
+        const rep = {
+          level, legs: route.legs.length,
+          trueAngle: Math.round(route.home.angle * 10) / 10, guessAngle: Math.round(guessAngle * 10) / 10,
+          angErr: Math.round(sc.angErr * 10) / 10, angErrSigned: Math.round(sc.angErrSigned * 10) / 10,
+          trueDist: Math.round(route.home.dist * 100) / 100, guessDist: Math.round(guessDist * 100) / 100,
+          distErrPct: Math.round(sc.distErrPct), t: Math.round(performance.now() - sessionT0)
+        };
+        reps.push(rep);
+        const end = route.points[route.points.length - 1], gr = guessAngle * D2R;
+        const guessWorld = { x: end.x + guessDist * Math.sin(gr), y: end.y + guessDist * Math.cos(gr) };
+
+        /* progression */
+        let announce = null;
+        streak.push(rep.angErr);
+        const thr = level <= 3 ? 20 : 25;
+        if (intensity !== 'ease' && level < 6 && streak.length >= 5 && St.mean(streak.slice(-5)) < thr) { level++; streak = []; announce = 'Level ' + level + ' unlocked'; }
+        else if (level > 1 && streak.length >= 3 && St.mean(streak.slice(-3)) > 60) { level--; streak = []; announce = 'Back to level ' + level + ' for now'; }
+
+        /* feedback */
+        scene = { mode: 'feedback', route, guessWorld };
+        const timeUp = performance.now() - sessionT0 >= durationMs;
+        const next = el('button', { class: 'btn btn-primary btn-big', type: 'button', text: timeUp ? 'Finish' : 'Next' });
+        const sign = v => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v);
+        showOverlay(el('div', { class: 'card dr-panel dr-feedback' }, [
+          el('div', { class: 'label', text: 'Rep ' + reps.length + ' · Level ' + rep.level }),
+          el('div', { class: 'dr-scores' }, [
+            el('div', null, [el('div', { class: 'num dr-big', text: Math.round(rep.angErr) + '°' }), el('div', { class: 'label', text: 'Direction off' })]),
+            el('div', null, [el('div', { class: 'num dr-big', text: sign(rep.distErrPct) + '%' }), el('div', { class: 'label', text: 'Distance' })])]),
+          el('p', { class: 'dr-coach', text: coach(route, guessAngle, sc) }),
+          el('div', { class: 'dr-legend' }, [
+            el('span', null, [el('i', { class: 'dr-sw dr-sw-good' }), 'True way home']),
+            el('span', null, [el('i', { class: 'dr-sw dr-sw-signal' }), 'Your guess'])]),
+          next]), 'dr-overlay-side');
+        updateHud();
+        if (announce) showToast(announce);
+        const nr = await clicked(next);
+        hideOverlay();
+        return nr === ABORT ? ABORT : true;
+      }
+
+      function finish(aborted) {
+        if (finished) return; finished = true;
+        cancelAnimationFrame(raf); timers.forEach(clearTimeout);
+        window.removeEventListener('resize', refit);
+        if (mq && mq.removeEventListener) mq.removeEventListener('change', readPal);
+        if (signal) signal.removeEventListener('abort', onAbort);
+        root.remove();
+        const errs = reps.map(r => r.angErr);
+        const res = { reps, n: reps.length, meanAngErr: errs.length ? St.mean(errs) : null, medianAngErr: errs.length ? St.median(errs) : null, startLevel, level, seenCards: [...seen].sort((a, b) => a - b) };
+        if (aborted) res.aborted = true;
+        resolve(res);
+      }
+
+      (async () => {
+        try {
+          updateHud();
+          if ((await instructions()) === ABORT) return finish(true);
+          hideOverlay();
+          sessionT0 = performance.now();
+          while (true) {
+            updateHud();
+            if ((await techniqueCard()) === ABORT) return finish(true);
+            if ((await doRep()) === ABORT) return finish(true);
+            if (performance.now() - sessionT0 >= durationMs) return finish(false);
+          }
+        } catch (err) { console.error(err); finish(true); }
+      })();
+    });
+  }
+
+  const root = typeof window !== 'undefined' ? window : globalThis;
+  if (root.Scout && root.Scout.modules) root.Scout.modules.deadreck = { run, _geo: geo };
+  if (typeof module !== 'undefined' && module.exports) module.exports = geo;
+})();
+
+;
+/* First Light — history module: progress tabs, inline SVG charts, calendar strip, clear-data control. */
+(function () {
+  const root = typeof window !== 'undefined' ? window : globalThis;
+  const Scout = root.Scout;
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DAY = 864e5;
+
+  /* ---------- pure helpers (DOM-free, testable in node) ---------- */
+  function dayNum(iso) { const [y, m, d] = iso.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY); }
+  function isoOf(n) { const d = new Date(n * DAY); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
+  function shortDate(n) { const d = new Date(n * DAY); return d.getUTCDate() + ' ' + MONTHS[d.getUTCMonth()]; }
+  function weekdayMon0(n) { return (n + 3) % 7; } /* day 0 = Thu 1 Jan 1970 */
+
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const e = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / e;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * e;
+  }
+  function niceTicks(lo, hi, count) {
+    if (lo === hi) { lo -= 1; hi += 1; }
+    const step = niceStep((hi - lo) / Math.max(1, count));
+    const start = Math.floor(lo / step + 1e-9) * step, end = Math.ceil(hi / step - 1e-9) * step;
+    const out = [];
+    for (let v = start; v <= end + step * 1e-6; v += step) out.push(+v.toFixed(10));
+    return out;
+  }
+  function xTicks(xmin, xmax, plotW, minGap) {
+    const span = Math.max(1e-6, xmax - xmin), ppd = plotW / span;
+    const steps = [1, 2, 3, 7, 14, 28, 56, 91, 182, 364, 728];
+    const step = steps.find(s => s * ppd >= minGap) || 728;
+    let d = Math.ceil(xmin);
+    if (step % 7 === 0) while (weekdayMon0(d) !== 0) d++;
+    const out = [];
+    for (; d <= xmax; d += step) out.push(d);
+    return out;
+  }
+  /* Rolling baseline band: for each value, mean ± 1 SD of up to `win` finite values before it, once ≥ minN exist. */
+  function rollingBand(values, win = 28, minN = 10) {
+    return values.map((_, i) => {
+      const prior = values.slice(0, i).filter(Number.isFinite).slice(-win);
+      if (prior.length < minN) return null;
+      const m = Scout.stats.mean(prior), s = Scout.stats.sd(prior);
+      return { mean: m, sd: s, lo: m - s, hi: m + s, n: prior.length };
+    });
+  }
+
+  /* Computes the geometry of a chart. spec: { points:[{x,y,status?}], band?:[{x,lo,hi}], kind:'line'|'bars'|'step',
+     yZero?, yDomain?, yTicks?, markers?:[{x,label}] } → shapes in pixel space. */
+  function layoutChart(spec, W, H) {
+    const pad = { l: 46, r: 16, t: spec.markers && spec.markers.length ? 22 : 12, b: 26 };
+    const pw = Math.max(10, W - pad.l - pad.r), ph = Math.max(10, H - pad.t - pad.b);
+    const pts = spec.points;
+    const xs = pts.map(p => p.x);
+    let xmin = Math.min(...xs), xmax = Math.max(...xs);
+    if (xmin === xmax) { xmin -= 1; xmax += 1; } else { const p = Math.max(0.6, (xmax - xmin) * 0.03); xmin -= p; xmax += p; }
+    let ticks;
+    if (spec.yDomain) ticks = spec.yTicks || niceTicks(spec.yDomain[0], spec.yDomain[1], 4);
+    else {
+      const ys = pts.map(p => p.y);
+      (spec.band || []).forEach(b => { if (b) ys.push(b.lo, b.hi); });
+      let ymin = Math.min(...ys), ymax = Math.max(...ys);
+      const span = ymax - ymin || Math.max(1, Math.abs(ymax) * 0.1);
+      ymin -= span * 0.08; ymax += span * 0.08;
+      if (spec.yZero) ymin = 0; else if (ymin < 0 && Math.min(...ys) >= 0) ymin = 0;
+      ticks = niceTicks(ymin, ymax, H < 160 ? 2 : 4);
+    }
+    const y0 = spec.yDomain ? spec.yDomain[0] : ticks[0], y1 = spec.yDomain ? spec.yDomain[1] : ticks[ticks.length - 1];
+    const sx = x => pad.l + (x - xmin) / (xmax - xmin) * pw;
+    const sy = y => pad.t + ph - (y - y0) / ((y1 - y0) || 1) * ph;
+    const f = v => Math.round(v * 10) / 10;
+
+    const out = { W, H, pad, pw, ph,
+      yTicks: ticks.map(v => ({ v, y: f(sy(v)) })),
+      xTicks: xTicks(xmin, xmax, pw, 58).map(d => ({ d, x: f(sx(d)), label: shortDate(d) })),
+      points: pts.map((p, i) => ({ x: f(sx(p.x)), y: f(sy(p.y)), status: p.status, last: i === pts.length - 1 })),
+      bandPaths: [], line: '', bars: [], markers: [] };
+
+    if (spec.band) {
+      let seg = [];
+      const flush = () => {
+        if (seg.length) {
+          const top = seg.map(b => f(sx(b.x)) + ',' + f(sy(b.hi))), bot = seg.slice().reverse().map(b => f(sx(b.x)) + ',' + f(sy(b.lo)));
+          if (seg.length === 1) { const x = f(sx(seg[0].x)); top.unshift((x - 4) + ',' + f(sy(seg[0].hi))); bot.push((x - 4) + ',' + f(sy(seg[0].lo))); }
+          out.bandPaths.push('M' + top.concat(bot).join('L') + 'Z');
+        }
+        seg = [];
+      };
+      spec.band.forEach(b => { if (b && Number.isFinite(b.lo) && Number.isFinite(b.hi)) seg.push(b); else flush(); });
+      flush();
+    }
+    if (spec.kind === 'line') out.line = out.points.map((p, i) => (i ? 'L' : 'M') + p.x + ',' + p.y).join('');
+    if (spec.kind === 'step') out.line = out.points.map((p, i) => i ? 'H' + p.x + 'V' + p.y : 'M' + p.x + ',' + p.y).join('');
+    if (spec.kind === 'bars') {
+      const ppd = pw / (xmax - xmin), bw = Math.max(2, Math.min(14, ppd * 0.6)), base = sy(Math.max(y0, 0));
+      out.bars = out.points.map(p => ({ x: f(p.x - bw / 2), y: Math.min(p.y, f(base)), w: f(bw), h: f(Math.max(Math.abs(base - p.y), p.y === f(base) ? 0 : 1)), last: p.last }));
+    }
+    (spec.markers || []).forEach(m => out.markers.push({ x: f(sx(m.x)), label: m.label }));
+    return out;
+  }
+
+  /* 5 calendar weeks (Mon-start) ending with the current week. */
+  function calendarCells(sessions, todayIso) {
+    const today = dayNum(todayIso), end = today + (6 - weekdayMon0(today)), start = end - 34;
+    const byDate = {};
+    sessions.forEach(s => { if (s && s.date) byDate[s.date] = (s.readiness && s.readiness.status) || 'logged'; });
+    const cells = [];
+    for (let d = start; d <= end; d++) {
+      const iso = isoOf(d);
+      cells.push({ iso, label: shortDate(d), status: byDate[iso] || null, today: d === today, future: d > today });
+    }
+    return cells;
+  }
+
+  /* Plausible fake sessions for a labelled demo. Deterministic for a given seed. */
+  function sample(n = 42, seed = 7) {
+    let a = seed >>> 0;
+    const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+    const today = dayNum(Scout.util.todayISO());
+    const out = [], rts = [], lapsesHist = [];
+    let level = 1, sinceLevel = 0, idx = 0;
+    const sleeps = ['<5', '5-6', '6-7', '7-8', '8+'];
+    for (let i = n - 1; i >= 0; i--) {
+      if (i > 0 && rnd() < 0.15) continue; /* missed morning */
+      const progress = 1 - i / Math.max(1, n - 1), date = isoOf(today - i);
+      const bad = rnd() < 0.09;
+      const medianRT = Math.round(270 + gauss() * 15 + (bad ? 45 + rnd() * 30 : 0));
+      const lapses = bad ? 3 + Math.floor(rnd() * 6) : Math.floor(rnd() * 2.6);
+      const slow10 = Math.round(medianRT * 1.45 + rnd() * 25 + (bad ? 60 : 0));
+      const base = Scout.stats.baseline(rts), lb = Scout.stats.baseline(lapsesHist);
+      let status = 'calibrating';
+      const z = { medianRT: 0, lapses: 0, slow10: 0 };
+      if (base.n >= 10) {
+        z.medianRT = +((medianRT - base.mean) / (base.sd || 1)).toFixed(2);
+        z.lapses = +((lapses - lb.mean) / (lb.sd || 1)).toFixed(2);
+        z.slow10 = +(z.medianRT * 0.9).toFixed(2);
+        const worst = Math.max(z.medianRT, z.lapses * 0.8);
+        status = worst >= 2 ? 'red' : worst >= 1 ? 'amber' : 'green';
+      }
+      rts.push(medianRT); lapsesHist.push(lapses);
+      const stage = progress < 0.4 ? 1 : progress < 0.75 ? 2 : 3;
+      const thr = Math.round((90 + 130 * Math.exp(-3 * progress)) * (1 + gauss() * 0.06) + (stage > 1 && progress % 0.4 < 0.06 ? 25 : 0));
+      sinceLevel++;
+      if (sinceLevel > 5 && level < 6 && rnd() < 0.35) { level++; sinceLevel = 0; }
+      const angErr = Math.max(6, Math.round(18 + level * 3 + 22 * Math.exp(-sinceLevel / 2) + gauss() * 5));
+      out.push({
+        id: 'demo-' + (++idx), date, startedAt: date + 'T0' + (6 + Math.floor(rnd() * 3)) + ':' + String(Math.floor(rnd() * 60)).padStart(2, '0') + ':00.000Z',
+        checkin: { kss: bad ? 7 : 3 + Math.floor(rnd() * 3), sleep: bad ? sleeps[Math.floor(rnd() * 2)] : sleeps[2 + Math.floor(rnd() * 3)], quality: bad ? 2 : 3 + Math.floor(rnd() * 2), caffeine: rnd() < 0.5, alcohol: bad && rnd() < 0.5, load: 2 + Math.floor(rnd() * 3) },
+        pvt: { trials: [], n: 60 + Math.floor(rnd() * 15), medianRT, meanRT: Math.round(medianRT * 1.06), lapses, slow10, fast10: Math.round(medianRT * 0.8), falseStarts: Math.floor(rnd() * 2), durationMs: 180000 },
+        readiness: { status, z, baselineN: Math.min(base.n, 28) },
+        widefield: rnd() < 0.08 ? null : { trials: [], n: 40, accuracy: +(0.7 + rnd() * 0.15).toFixed(2), thresholdMs: thr, finalExposureMs: thr, frameMs: 16.7, stage },
+        deadreck: rnd() < 0.1 ? null : { reps: [], n: 8, meanAngErr: angErr, medianAngErr: Math.round(angErr * 0.9), startLevel: level, level, seenCards: Array.from({ length: level }, (_, k) => k + 1) }
+      });
+    }
+    return out;
+  }
+
+  /* ---------- DOM ---------- */
+  function svg(tag, attrs, parent) {
+    const n = document.createElementNS(SVGNS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function renderChart(host, spec, W, H, fmt) {
+    host.textContent = '';
+    const L = layoutChart(spec, W, H);
+    const s = svg('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, class: 'hs-svg', role: 'img', 'aria-label': spec.aria || '' }, host);
+    L.yTicks.forEach(t => {
+      svg('line', { x1: L.pad.l, x2: W - L.pad.r, y1: t.y, y2: t.y, class: 'hs-grid' }, s);
+      svg('text', { x: L.pad.l - 8, y: t.y, class: 'hs-axis', 'text-anchor': 'end', 'dominant-baseline': 'middle' }, s).textContent = fmt ? fmt(t.v) : String(t.v);
+    });
+    L.xTicks.forEach(t => {
+      svg('text', { x: t.x, y: H - 6, class: 'hs-axis', 'text-anchor': 'middle' }, s).textContent = t.label;
+    });
+    L.markers.forEach(m => {
+      svg('line', { x1: m.x, x2: m.x, y1: L.pad.t - 4, y2: L.pad.t + L.ph, class: 'hs-marker' }, s);
+      svg('text', { x: m.x + 4, y: L.pad.t - 8, class: 'hs-axis hs-marker-label' }, s).textContent = m.label;
+    });
+    L.bandPaths.forEach(d => svg('path', { d, class: 'hs-band' }, s));
+    L.bars.forEach(b => svg('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: Math.min(2, b.w / 3), class: 'hs-bar' + (b.last ? ' hs-last' : '') }, s));
+    if (L.line) svg('path', { d: L.line, class: 'hs-line' }, s);
+    if (spec.kind === 'line') L.points.forEach(p => svg('circle', { cx: p.x, cy: p.y, r: p.last ? 6.5 : 4, class: 'hs-pt' + (p.status ? ' hs-pt-' + p.status : '') + (p.last ? ' hs-last' : '') }, s));
+    if (spec.kind === 'step' && L.points.length) { const p = L.points[L.points.length - 1]; svg('circle', { cx: p.x, cy: p.y, r: 5.5, class: 'hs-pt hs-last' }, s); }
+  }
+
+  function mount(container, sessions, options) {
+    options = options || {};
+    const U = Scout.util, el = U.el;
+    sessions = (Array.isArray(sessions) ? sessions : []).filter(s => s && s.date);
+    let tab = 'readiness';
+    const charts = [];
+    let ro = null;
+    const onWinResize = () => charts.forEach(c => c.draw());
+    if (typeof ResizeObserver !== 'undefined') ro = new ResizeObserver(entries => entries.forEach(e => { const c = charts.find(c => c.host === e.target); if (c) c.draw(); }));
+    else window.addEventListener('resize', onWinResize);
+
+    const rootEl = el('div', { class: 'hs-root' });
+    const tabs = el('div', { class: 'seg hs-tabs', role: 'tablist' });
+    const body = el('div', { class: 'hs-body' });
+    const TABS = [['readiness', 'Readiness'], ['widefield', 'Wide Field'], ['deadreck', 'Dead Reckoning']];
+    const tabBtns = TABS.map(([k, label]) => {
+      const b = el('button', { type: 'button', role: 'tab', 'aria-pressed': String(k === tab), text: label });
+      b.addEventListener('click', () => { if (tab !== k) { tab = k; tabBtns.forEach((x, i) => x.setAttribute('aria-pressed', String(TABS[i][0] === tab))); renderTab(); } });
+      tabs.appendChild(b);
+      return b;
+    });
+
+    /* clear-data control with inline two-step confirm */
+    const clearWrap = el('div', { class: 'hs-clear' });
+    function showClearIdle() {
+      clearWrap.textContent = '';
+      clearWrap.appendChild(el('button', { type: 'button', class: 'btn btn-quiet', text: 'Clear all data', onclick: showClearConfirm }));
+    }
+    function showClearConfirm() {
+      clearWrap.textContent = '';
+      clearWrap.appendChild(el('div', { class: 'card hs-confirm', role: 'alertdialog', 'aria-label': 'Confirm delete' }, [
+        el('p', { class: 'hs-confirm-text', text: 'This deletes every session on this tablet.' }),
+        el('div', { class: 'row' }, [
+          el('button', { type: 'button', class: 'btn', text: 'Cancel', onclick: showClearIdle }),
+          el('button', { type: 'button', class: 'btn btn-danger', text: 'Delete everything', onclick: () => {
+            clearWrap.textContent = '';
+            clearWrap.appendChild(el('p', { class: 'muted', text: 'All sessions deleted.' }));
+            if (options.onClearAll) options.onClearAll();
+          } })
+        ])
+      ]));
+    }
+    showClearIdle();
+
+    rootEl.append(tabs, body, clearWrap);
+    container.appendChild(rootEl);
+
+    function addChart(parent, title, caption, height, specFn, fmt) {
+      const host = el('div', { class: 'hs-chart', style: `height:${height}px` });
+      parent.appendChild(el('section', { class: 'card hs-card' }, [
+        el('div', { class: 'spread hs-chart-head' }, [el('div', { class: 'label', text: title }), el('div', { class: 'muted hs-caption', text: caption })]),
+        host
+      ]));
+      const c = { host, w: 0, draw(force) {
+        const w = Math.floor(host.clientWidth);
+        if (!w || (!force && w === c.w)) return;
+        c.w = w; renderChart(host, specFn(), w, height, fmt);
+      } };
+      charts.push(c);
+      if (ro) ro.observe(host);
+      c.draw(true);
+    }
+    function summary(items) {
+      return el('div', { class: 'hs-summary' }, items.map(([label, value, unit]) =>
+        el('div', { class: 'hs-stat' }, [el('div', { class: 'label', text: label }), el('div', { class: 'hs-stat-val' }, [el('span', { class: 'num', text: value }), unit ? el('span', { class: 'muted hs-unit', text: unit }) : null])])));
+    }
+    function empty(text) { return el('div', { class: 'card hs-empty muted', text }); }
+
+    function renderReadiness() {
+      const rows = sessions.filter(s => s.pvt && Number.isFinite(s.pvt.medianRT));
+      const vals = rows.map(s => s.pvt.medianRT);
+      const base = Scout.stats.baseline(vals);
+      body.appendChild(summary([
+        ['Sessions logged', String(sessions.length)],
+        base.n >= 10 ? ['Baseline median RT', Math.round(base.mean) + ' ± ' + Math.round(base.sd), 'ms'] : ['Baseline', 'calibrating', base.n + ' / 10 tests'],
+        rows.length ? ['Latest', String(Math.round(vals[vals.length - 1])), 'ms'] : null
+      ].filter(Boolean)));
+      if (!rows.length) body.appendChild(empty('No vigilance tests yet. After your first morning check, your reaction times appear here.'));
+      else {
+        const band = rollingBand(vals);
+        addChart(body, 'Reaction time', 'median ms · lower is better · band = your usual range', 220, () => ({
+          kind: 'line', aria: 'Median reaction time per session',
+          points: rows.map(s => ({ x: dayNum(s.date), y: s.pvt.medianRT, status: (s.readiness && s.readiness.status) || 'calibrating' })),
+          band: band.map((b, i) => b && { x: dayNum(rows[i].date), lo: b.lo, hi: b.hi })
+        }));
+        addChart(body, 'Lapses', 'responses ≥ 355 ms · fewer is better', 120, () => ({
+          kind: 'bars', yZero: true, aria: 'Lapses per session',
+          points: rows.map(s => ({ x: dayNum(s.date), y: s.pvt.lapses || 0 }))
+        }));
+      }
+      if (sessions.length) {
+        const cells = calendarCells(sessions, U.todayISO());
+        const grid = el('div', { class: 'hs-cal-grid' });
+        ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].forEach(d => grid.appendChild(el('div', { class: 'hs-cal-head', text: d })));
+        cells.forEach(c => grid.appendChild(el('div', { class: 'hs-cal-cell' + (c.today ? ' hs-cal-today' : '') + (c.future ? ' hs-cal-future' : ''), title: c.label + (c.status ? ' · ' + c.status : '') },
+          el('span', { class: 'hs-cal-dot' + (c.status ? ' hs-cal-' + c.status : '') }))));
+        body.appendChild(el('section', { class: 'card hs-card' }, [
+          el('div', { class: 'spread hs-chart-head' }, [el('div', { class: 'label', text: 'Last 5 weeks' }), el('div', { class: 'muted hs-caption', text: 'one dot per morning · colour = readiness' })]),
+          grid
+        ]));
+      }
+    }
+
+    function renderWidefield() {
+      const rows = sessions.filter(s => s.widefield && Number.isFinite(s.widefield.thresholdMs));
+      if (!rows.length) { body.appendChild(empty('No Wide Field sessions yet. Your flash-exposure threshold will be tracked here.')); return; }
+      const thr = rows.map(s => s.widefield.thresholdMs), last = rows[rows.length - 1].widefield;
+      body.appendChild(summary([
+        ['Best threshold', String(Math.round(Math.min(...thr))), 'ms'],
+        ['Latest threshold', String(Math.round(last.thresholdMs)), 'ms'],
+        ['Stage', String(last.stage || 1)]
+      ]));
+      const markers = [];
+      rows.forEach((s, i) => { if (i && (s.widefield.stage || 1) > (rows[i - 1].widefield.stage || 1)) markers.push({ x: dayNum(s.date), label: 'Stage ' + s.widefield.stage }); });
+      addChart(body, 'Exposure threshold', 'ms needed to catch the edge · lower is better', 220, () => ({
+        kind: 'line', markers, aria: 'Wide Field threshold per session',
+        points: rows.map(s => ({ x: dayNum(s.date), y: s.widefield.thresholdMs }))
+      }));
+    }
+
+    function renderDeadreck() {
+      const rows = sessions.filter(s => s.deadreck && Number.isFinite(s.deadreck.meanAngErr));
+      if (!rows.length) { body.appendChild(empty('No Dead Reckoning sessions yet. Your pointing error and level will be tracked here.')); return; }
+      const last = rows[rows.length - 1].deadreck;
+      body.appendChild(summary([
+        ['Current level', String(last.level || 1), 'of 6'],
+        ['Latest mean error', String(Math.round(last.meanAngErr)), '°'],
+        ['Best mean error', String(Math.round(Math.min(...rows.map(s => s.deadreck.meanAngErr)))), '°']
+      ]));
+      addChart(body, 'Pointing error', 'mean degrees off home · lower is better', 220, () => ({
+        kind: 'line', yZero: true, aria: 'Dead Reckoning mean angle error per session',
+        points: rows.map(s => ({ x: dayNum(s.date), y: s.deadreck.meanAngErr }))
+      }), v => v + '°');
+      addChart(body, 'Level', 'level at end of session · higher is harder', 120, () => ({
+        kind: 'step', yDomain: [0.5, 6.5], yTicks: [1, 3, 6], aria: 'Dead Reckoning level per session',
+        points: rows.map(s => ({ x: dayNum(s.date), y: s.deadreck.level || 1 }))
+      }), v => 'L' + v);
+    }
+
+    function renderTab() {
+      if (ro) charts.forEach(c => ro.unobserve(c.host));
+      charts.length = 0;
+      body.textContent = '';
+      if (tab === 'readiness') renderReadiness();
+      else if (tab === 'widefield') renderWidefield();
+      else renderDeadreck();
+    }
+    renderTab();
+
+    return {
+      destroy() {
+        if (ro) ro.disconnect();
+        window.removeEventListener('resize', onWinResize);
+        charts.length = 0;
+        rootEl.remove();
+      }
+    };
+  }
+
+  Scout.modules.history = { mount, sample, _pure: { dayNum, isoOf, shortDate, niceTicks, xTicks, rollingBand, layoutChart, calendarCells } };
+})();
+
+;
+/* First Light — app shell: home, check-in, readout, flow, field drills, settings. */
+(function () {
+  const { store, stats, util } = Scout;
+  const { el } = util;
+  const app = document.getElementById('app');
+  const CALIBRATION_DAYS = 10;
+  const PVT_MS = 180000, TRAIN_MS = 120000;
+
+  /* ---------- data ---------- */
+  const loadSessions = () => store.get('sessions', []);
+  const saveSessions = s => store.set('sessions', s);
+  const loadTrain = () => Object.assign({ wfExposureMs: 250, wfStage: 1, drLevel: 1, seenCards: [] }, store.get('train', {}));
+  const saveTrain = t => store.set('train', t);
+  const loadPrefs = () => Object.assign({ widefield: true, deadreck: true }, store.get('prefs', {}));
+  const savePrefs = p => store.set('prefs', p);
+
+  function upsertSession(session) {
+    const all = loadSessions();
+    const i = all.findIndex(s => s.id === session.id);
+    if (i >= 0) all[i] = session; else all.push(session);
+    saveSessions(all);
+  }
+
+  const validPvt = s => s.pvt && !s.pvt.aborted && s.pvt.n >= 10;
+
+  /* Readiness vs personal rolling baseline. */
+  function computeReadiness(pvt, prior) {
+    const usable = prior.filter(validPvt);
+    if (!pvt || pvt.aborted || pvt.n < 10) return null;
+    if (usable.length < CALIBRATION_DAYS) return { status: 'calibrating', z: {}, baselineN: usable.length };
+    const floors = { medianRT: 8, lapses: 1, slow10: 15 };
+    const z = {}, base = {};
+    for (const k of Object.keys(floors)) {
+      const b = stats.baseline(usable.map(s => s.pvt[k]), 28);
+      base[k] = b;
+      z[k] = (pvt[k] - b.mean) / Math.max(Number.isFinite(b.sd) ? b.sd : 0, floors[k]);
+    }
+    const zs = Object.values(z), maxz = Math.max(...zs), avgz = stats.mean(zs);
+    const status = (maxz >= 2 || avgz >= 1.5) ? 'red' : (maxz >= 1 || avgz >= 0.75) ? 'amber' : 'green';
+    return { status, z, base, baselineN: usable.length };
+  }
+
+  const STATUS_TEXT = {
+    green: ['Green', 'inside your normal range', 'Full training, difficulty pushed.', 'push'],
+    amber: ['Amber', 'a little below your normal', 'Training holds steady at today’s level.', 'hold'],
+    red: ['Red', 'clearly below your normal', 'Shorter, easier training today. Consolidate, don’t chase.', 'ease'],
+    calibrating: ['Calibrating', 'building your baseline', 'Train as normal while your baseline builds.', 'push']
+  };
+
+  /* ---------- helpers ---------- */
+  function show(node) { app.replaceChildren(node); window.scrollTo(0, 0); }
+  function fmtDate(iso) { const d = new Date(iso + 'T12:00:00'); return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function seg(id, options, value, onChange) {
+    const wrap = el('div', { class: 'seg', role: 'group', id });
+    options.forEach(([val, label]) => {
+      const b = el('button', { type: 'button', 'aria-pressed': String(val === value), text: label });
+      b.addEventListener('click', () => {
+        wrap.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', 'false'));
+        b.setAttribute('aria-pressed', 'true'); onChange(val);
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+  const compass = () => {
+    const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    s.setAttribute('viewBox', '0 0 40 40'); s.setAttribute('class', 'ms-mark'); s.setAttribute('aria-hidden', 'true');
+    s.innerHTML = '<circle cx="20" cy="20" r="17" fill="none" stroke="var(--line)" stroke-width="2"/>' +
+      '<path d="M20 5 L24 20 L20 35 L16 20 Z" fill="var(--muted)"/><path d="M20 5 L24 20 L16 20 Z" fill="var(--accent)"/>' +
+      '<circle cx="20" cy="20" r="2.2" fill="var(--surface)"/>';
+    return s;
+  };
+
+  let wakeLock = null;
+  async function keepAwake(on) {
+    try {
+      if (on && 'wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); }
+      if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch (e) { wakeLock = null; }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && document.body.classList.contains('ms-running')) keepAwake(true); });
+
+  /* Run a stage module in a full-screen container. */
+  async function runStage(mod, options) {
+    const stageEl = el('div', { class: 'stage' });
+    document.body.appendChild(stageEl);
+    document.body.classList.add('ms-running');
+    const ctrl = new AbortController();
+    try {
+      return await Scout.modules[mod].run(stageEl, Object.assign({}, options, { signal: ctrl.signal, onExit: () => ctrl.abort() }));
+    } finally {
+      stageEl.remove();
+      document.body.classList.remove('ms-running');
+    }
+  }
+
+  /* ---------- home ---------- */
+  const STATEMENT = {
+    first: ['Day one', 'Ten mornings build your baseline. Start the first.'],
+    calibrating: ['Building baseline', 'Each session sharpens the picture of your normal. Readings get a status from day eleven.'],
+    green: ['Ready to push', 'Last reading sat inside your normal range.'],
+    amber: ['Hold steady', 'Last reading was a little below your normal.'],
+    red: ['Ease off', 'Last reading was clearly below your normal.']
+  };
+
+  const navLink = (icon, label, onclick) => el('button', { class: 'ms-navlink', type: 'button', onclick }, [
+    el('span', { class: 'ms-icon', 'aria-hidden': 'true', text: icon }), el('span', { text: label })
+  ]);
+  function topNav() {
+    return el('nav', { class: 'ms-topnav', 'aria-label': 'Main' }, [
+      navLink('?', 'About', about),
+      navLink('↺', 'History', () => historyScreen()),
+      navLink('⌖', 'Field drills', drills),
+      navLink('⚙︎', 'Settings', settings),
+      document.documentElement.requestFullscreen && navLink('⤢', 'Full screen', () => { document.documentElement.requestFullscreen().catch(() => {}); })
+    ]);
+  }
+
+  function home() {
+    const sessions = loadSessions(), train = loadTrain(), prefs = loadPrefs();
+    const valid = sessions.filter(validPvt);
+    const today = util.todayISO();
+    const doneToday = sessions.some(s => s.date === today && s.pvt);
+    const last = [...sessions].reverse().find(s => s.readiness);
+    const calibrating = valid.length < CALIBRATION_DAYS;
+    const key = !valid.length ? 'first' : calibrating ? 'calibrating' : (last && last.readiness ? last.readiness.status : 'calibrating');
+    const [headline, sub] = STATEMENT[key] || STATEMENT.calibrating;
+    const pad2 = n => String(n).padStart(2, '0');
+    const d = new Date();
+    const dateLabel = d.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+    const rows = [
+      ['Check-in', 'Sleepiness and context.', '0:30'],
+      ['Reaction check', 'Readiness measure. Fixed, never trained.', fmtClock(PVT_MS)],
+      prefs.widefield && ['Wide Field', `Peripheral awareness. Stage ${train.wfStage}, flash ${Math.round(train.wfExposureMs)} ms.`, fmtClock(TRAIN_MS)],
+      prefs.deadreck && ['Dead Reckoning', `Path integration. Level ${train.drLevel}, ${DR_LEVELS[train.drLevel - 1].toLowerCase()}.`, fmtClock(TRAIN_MS)]
+    ].filter(Boolean);
+    const totalSec = rows.reduce((s, r) => { const [m, sec] = r[2].split(':').map(Number); return s + m * 60 + sec; }, 0);
+
+    show(el('main', { class: 'screen ms-home' }, [
+      el('header', { class: 'ms-mast' }, [
+        el('div', { class: 'ms-topbar' }, [el('h1', { class: 'ms-wordmark', text: 'First Light' }), topNav()]),
+        el('div', { class: 'ms-meta' }, [
+          el('span', { class: 'label', text: calibrating ? `Calibrating ${pad2(valid.length)}/${CALIBRATION_DAYS}` : `Baseline ${valid.length} sessions` }),
+          el('span', { class: 'label', text: dateLabel }),
+          el('span', { class: 'label', text: `Session ≈ ${Math.round(totalSec / 30) / 2} min` }),
+          el('span', { class: 'label ms-arrow', 'aria-hidden': 'true', text: '↓' })
+        ])
+      ]),
+      el('section', { class: 'ms-statement ms-in' }, [
+        el('h2', { class: 'h-display', text: headline }),
+        el('div', { class: 'ms-statement-side' }, [
+          !calibrating && last && el('div', { class: 'row ms-laststat' }, [el('span', { class: 'dot ' + last.readiness.status }), el('span', { class: 'label', text: (doneToday ? 'Today · ' : 'Last · ') + fmtDate(last.date) })]),
+          calibrating && el('div', { class: 'ms-calbar', 'aria-label': `${valid.length} of ${CALIBRATION_DAYS} calibration sessions` },
+            Array.from({ length: CALIBRATION_DAYS }, (_, i) => el('span', { class: i < valid.length ? 'on' : '' }))),
+          el('p', { class: 'muted', text: sub }),
+          doneToday && el('p', { class: 'muted ms-small', text: 'Already logged today. The first session of the day is the cleanest reading.' })
+        ])
+      ]),
+      el('section', { class: 'ms-rows' }, rows.map(([name, desc, time], i) => el('div', { class: 'ms-specrow ms-in', style: `animation-delay:${60 + i * 50}ms` }, [
+        el('div', { class: 'ms-specname', text: name }),
+        el('div', { class: 'ms-specdesc muted', text: desc }),
+        el('div', { class: 'num ms-spectime', text: time })
+      ]))),
+      el('div', { class: 'ms-actions' }, [
+        el('button', { class: 'btn btn-primary btn-big', type: 'button', onclick: checkin }, [doneToday ? 'Run another session' : 'Begin session', el('span', { class: 'ms-icon', 'aria-hidden': 'true', text: '→' })])
+      ]),
+      sessionStrip(sessions)
+    ]));
+  }
+  const DR_LEVELS = ['Map view, square turns', 'Legs vanish', 'Angled turns', 'Turning with the world', 'Pace × time', 'Full integration'];
+  function fmtClock(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+  /* Progress is read per session, not per calendar week: skipped days don't distort it. */
+  function sessionStrip(sessions) {
+    const N = 10;
+    const logged = sessions.filter(s => s.pvt);
+    const recent = logged.slice(-N);
+    const offset = logged.length - recent.length;
+    const cells = Array.from({ length: N }, (_, i) => recent[i] ? { s: recent[i], num: offset + i + 1 } : null);
+    const shortD = iso => { const d = new Date(iso + 'T12:00:00'); return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0'); };
+    return el('section', { class: 'ms-week' }, [
+      el('div', { class: 'spread' }, [
+        el('span', { class: 'label', text: `Last ${N} sessions` }),
+        el('span', { class: 'label', text: logged.length ? `${logged.length} logged in total` : 'Your first session fills the first square' })
+      ]),
+      el('div', { class: 'ms-weekrow' }, cells.map((c, i) => el('div', { class: 'ms-day' + (c && i === recent.length - 1 ? ' today' : '') }, c ? [
+        el('span', { class: 'ms-small', text: 'S' + String(c.num).padStart(2, '0') }),
+        el('span', { class: 'dot ' + ((c.s.readiness && c.s.readiness.status) || 'none'), title: (c.s.readiness && c.s.readiness.status) || 'no reading' }),
+        el('span', { class: 'ms-small', text: shortD(c.s.date) })
+      ] : [el('span', { class: 'ms-small', text: '—' }), el('span', { class: 'dot ms-future' }), el('span', { class: 'ms-small', text: '' })])))
+    ]);
+  }
+
+  /* ---------- check-in ---------- */
+  function checkin() {
+    const c = { kss: 5, sleep: null, quality: null, caffeine: null, alcohol: null, load: null };
+    const kssLabel = el('span', { class: 'num ms-kssval', text: '5' });
+    const KSS = { 1: 'Extremely alert', 2: 'Very alert', 3: 'Alert', 4: 'Rather alert', 5: 'Neither alert nor sleepy', 6: 'Some signs of sleepiness', 7: 'Sleepy, no effort to stay awake', 8: 'Sleepy, some effort to stay awake', 9: 'Very sleepy, fighting sleep' };
+    const kssText = el('span', { class: 'muted', text: KSS[5] });
+    /* Slider runs sleepy (left) to alert (right); the stored score stays on the standard Karolinska scale, 1 = extremely alert. */
+    const slider = el('input', { type: 'range', min: '1', max: '9', step: '1', value: '5', id: 'ms-kss', class: 'ms-range', 'aria-label': 'Alertness: left is very sleepy, right is extremely alert' });
+    slider.addEventListener('input', () => { c.kss = 10 - +slider.value; kssLabel.textContent = String(c.kss); kssText.textContent = KSS[c.kss]; });
+    const go = el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Continue →', disabled: true });
+    const check = () => { go.disabled = ['sleep', 'quality', 'caffeine', 'alcohol', 'load'].some(k => c[k] == null); };
+    const field = (label, hint, id, opts, key) => el('div', { class: 'ms-field' }, [
+      el('div', { class: 'ms-q' }, [el('div', { class: 'label', text: label }), el('div', { class: 'muted ms-small', text: hint })]),
+      seg(id, opts, null, v => { c[key] = v; check(); })]);
+    go.addEventListener('click', () => startSession(c));
+
+    show(el('main', { class: 'screen ms-checkin' }, [
+      el('header', { class: 'spread' }, [el('h1', { class: 'h-display', text: 'Check-in' }), el('button', { class: 'btn btn-quiet', type: 'button', text: '← Cancel', onclick: home })]),
+      el('section', { class: 'card ms-kss' }, [
+        el('div', { class: 'spread' }, [
+          el('div', { class: 'ms-q' }, [el('div', { class: 'label', text: 'How alert are you right now?' }), el('div', { class: 'muted ms-small', text: 'How you feel this minute, not how you slept.' })]),
+          el('div', { class: 'row' }, [kssLabel, kssText])]),
+        slider,
+        el('div', { class: 'spread ms-small muted num' }, [el('span', { text: '← 9 · fighting sleep' }), el('span', { text: 'extremely alert · 1 →' })])
+      ]),
+      el('section', { class: 'ms-fields' }, [
+        field('Sleep last night', 'Your best guess at actual sleep, not time in bed.', 'ms-sleep', [['<5', 'under 5 h'], ['5-6', '5–6 h'], ['6-7', '6–7 h'], ['7-8', '7–8 h'], ['8+', '8 h +']], 'sleep'),
+        field('Sleep quality', 'How restored you felt on waking.', 'ms-quality', [['poor', 'Poor'], ['ok', 'OK'], ['good', 'Good']], 'quality'),
+        field('Caffeine yet?', 'It speeds reactions, so it’s logged, not judged.', 'ms-caffeine', [['no', 'No'], ['yes', 'Yes']], 'caffeine'),
+        field('Alcohol last night', 'Even a little breaks up deep sleep.', 'ms-alcohol', [['none', 'None'], ['1-2', '1–2'], ['3+', '3 +']], 'alcohol'),
+        field('Yesterday’s load', 'Mental and physical demand, taken together.', 'ms-load', [['light', 'Light'], ['normal', 'Normal'], ['heavy', 'Heavy']], 'load')
+      ]),
+      el('div', { class: 'row ms-right' }, [go])
+    ]));
+  }
+
+  /* ---------- session flow ---------- */
+  async function startSession(checkinData) {
+    keepAwake(true);
+    const session = { id: 's' + Date.now(), date: util.todayISO(), startedAt: new Date().toISOString(), checkin: checkinData, pvt: null, readiness: null, widefield: null, deadreck: null };
+    const prior = loadSessions();
+    upsertSession(session);
+
+    session.pvt = await runStage('pvt', { durationMs: PVT_MS });
+    session.readiness = computeReadiness(session.pvt, prior);
+    upsertSession(session);
+    readout(session, prior);
+  }
+
+  function readout(session, prior) {
+    const r = session.readiness;
+    if (!r) {
+      show(el('main', { class: 'screen' }, [
+        el('h1', { class: 'h-display', text: 'Reaction check incomplete' }),
+        el('p', { class: 'prose muted', text: 'The check ended before enough responses were recorded, so there’s no readiness reading today. You can still train, or start again from the home screen.' }),
+        el('div', { class: 'row' }, [
+          el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Train anyway', onclick: () => train(session, 'hold') }),
+          el('button', { class: 'btn', type: 'button', text: 'Home', onclick: () => { keepAwake(false); home(); } })
+        ])
+      ]));
+      return;
+    }
+    const [name, sub, trainText, intensity] = STATUS_TEXT[r.status];
+    const p = session.pvt;
+    const floors = { medianRT: 8, lapses: 1, slow10: 15 };
+    const specRow = (label, val, unit, key, note) => {
+      const b = key && r.base && r.base[key];
+      let gauge;
+      if (b && Number.isFinite(b.mean)) {
+        const sd = Math.max(Number.isFinite(b.sd) ? b.sd : 0, floors[key]);
+        const lo = Math.max(0, b.mean - 3 * sd), hi = b.mean + 3 * sd;
+        const pct = v => util.clamp((v - lo) / (hi - lo) * 100, 0, 100);
+        gauge = el('div', { class: 'ms-gauge', title: `usual ${fmt(b.mean, key)} ± ${fmt(sd, key)}` }, [
+          el('span', { class: 'ms-gauge-band', style: `left:${pct(b.mean - sd)}%;width:${pct(b.mean + sd) - pct(b.mean - sd)}%` }),
+          el('span', { class: 'ms-gauge-mark', style: `left:${pct(val)}%` })
+        ]);
+      } else if (key) {
+        gauge = el('div', { class: 'ms-redact', title: 'Baseline still building' });
+      }
+      return el('div', { class: 'ms-specline' }, [
+        el('div', { class: 'label', text: label }),
+        el('div', { class: 'ms-specvals' }, [
+          el('div', { class: 'num ms-specval' }, [String(val), unit && el('span', { class: 'ms-unit', text: unit })]),
+          gauge || el('span'),
+          el('div', { class: 'num ms-small muted ms-usual', text: b && Number.isFinite(b.mean) ? `usual ${fmt(b.mean, key)}` : note })
+        ])
+      ]);
+    };
+    const HEAD = { green: 'Ready to push', amber: 'Hold steady', red: 'Ease off', calibrating: 'Reading logged' };
+    const prefs = loadPrefs();
+    const anyTraining = prefs.widefield || prefs.deadreck;
+    show(el('main', { class: 'screen ms-readout' }, [
+      el('div', { class: 'ms-readout-grid' }, [
+        el('section', { class: 'ms-readout-left' }, [
+          el('div', { class: 'row' }, [el('span', { class: 'dot ' + r.status }), el('span', { class: 'label', text: `${name} · ${fmtDate(session.date)}` })]),
+          el('h1', { class: 'h-display', text: HEAD[r.status] }),
+          el('p', { class: 'muted prose', text: r.status === 'calibrating'
+            ? `Baseline ${r.baselineN + 1} of ${CALIBRATION_DAYS}. The redacted bars fill in once your normal range is known.`
+            : `Today’s reaction check is ${sub}.` }),
+          el('div', { class: 'ms-trainblock' }, [
+            el('div', { class: 'label', text: 'Training today' }),
+            el('p', { text: anyTraining ? trainText : 'Training is switched off in Settings.' }),
+            el('div', { class: 'row' }, [
+              anyTraining && el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Start training →', onclick: () => train(session, intensity) }),
+              el('button', { class: 'btn', type: 'button', text: 'Finish here', onclick: () => done(session) })
+            ])
+          ])
+        ]),
+        el('section', { class: 'ms-speccard' }, [
+          el('div', { class: 'spread' }, [el('span', { class: 'ms-specttl', text: 'Readout' }), el('span', { class: 'label', text: fmtDate(session.date) })]),
+          specRow('Median RT', Math.round(p.medianRT), 'ms', 'medianRT'),
+          specRow('Lapses', p.lapses, '', 'lapses'),
+          specRow('Slowest 10%', Math.round(p.slow10), 'ms', 'slow10'),
+          specRow('Sleepiness', session.checkin.kss, '/9', null, 'self-rated'),
+          specRow('False starts', p.falseStarts, '', null, 'early taps')
+        ])
+      ])
+    ]));
+  }
+  function fmt(v, key) { return key === 'lapses' ? v.toFixed(1) : Math.round(v); }
+
+  async function train(session, intensity) {
+    const prefs = loadPrefs();
+    const t = loadTrain();
+    if (prefs.widefield) {
+      const startStage = t.wfStage;
+      const wf = await runStage('widefield', { durationMs: TRAIN_MS, startExposureMs: t.wfExposureMs, stage: startStage, intensity });
+      session.widefield = wf; upsertSession(session);
+      if (wf && wf.n >= 8 && Number.isFinite(wf.thresholdMs)) {
+        if (wf.stage > startStage) { t.wfStage = wf.stage; t.wfExposureMs = 250; }
+        else t.wfExposureMs = util.clamp(Math.round(wf.thresholdMs), 17, 500);
+        saveTrain(t);
+      }
+      if (wf && wf.aborted) return done(session);
+    }
+    if (prefs.deadreck) {
+      const dr = await runStage('deadreck', { durationMs: TRAIN_MS, level: t.drLevel, intensity, seenCards: t.seenCards });
+      session.deadreck = dr; upsertSession(session);
+      if (dr) { if (dr.level) t.drLevel = dr.level; if (dr.seenCards) t.seenCards = dr.seenCards; saveTrain(t); }
+    }
+    done(session);
+  }
+
+  function done(session) {
+    keepAwake(false);
+    const all = loadSessions();
+    const prev = all.filter(s => s.id !== session.id);
+    const lastWf = [...prev].reverse().find(s => s.widefield && Number.isFinite(s.widefield.thresholdMs));
+    const lastDr = [...prev].reverse().find(s => s.deadreck && Number.isFinite(s.deadreck.meanAngErr));
+    const items = [];
+    if (session.readiness) items.push(row('Readiness', STATUS_TEXT[session.readiness.status][0], session.pvt ? `median ${Math.round(session.pvt.medianRT)} ms` : ''));
+    if (session.widefield && Number.isFinite(session.widefield.thresholdMs)) {
+      const w = session.widefield;
+      items.push(row('Wide Field', `${Math.round(w.thresholdMs)} ms`, `stage ${w.stage} · ${Math.round(w.accuracy * 100)}% correct` + (lastWf ? ` · last time ${Math.round(lastWf.widefield.thresholdMs)} ms` : '')));
+    }
+    if (session.deadreck && Number.isFinite(session.deadreck.meanAngErr)) {
+      const d = session.deadreck;
+      items.push(row('Dead Reckoning', `${Math.round(d.meanAngErr)}° off`, `level ${d.level} · ${d.n} routes` + (lastDr ? ` · last time ${Math.round(lastDr.deadreck.meanAngErr)}°` : '')));
+    }
+    show(el('main', { class: 'screen ms-done' }, [
+      el('h1', { class: 'h-display', text: 'Session logged' }),
+      el('section', { class: 'card ms-summary' }, items.length ? items : [el('p', { class: 'muted', text: 'Nothing was recorded this time.' })]),
+      el('section', { class: 'ms-carry' }, [
+        el('div', { class: 'label', text: 'Take it outside' }),
+        el('p', { class: 'prose', text: 'Next time you step outdoors, spend one minute in wide-angle gaze: rest your eyes on a point ahead, soften your focus, and notice movement at the edges without looking at it. On a walk, stop once and point to where you started before checking.' })
+      ]),
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn btn-primary btn-big', type: 'button', text: 'Home', onclick: home }),
+        el('button', { class: 'btn', type: 'button', text: 'History', onclick: historyScreen })
+      ])
+    ]));
+  }
+  function row(label, value, sub) {
+    return el('div', { class: 'ms-sumrow' }, [el('div', { class: 'label', text: label }), el('div', { class: 'h-2 num', text: value }), el('div', { class: 'muted ms-small', text: sub })]);
+  }
+
+  /* ---------- history ---------- */
+  let historyHandle = null;
+  function historyScreen(sample) {
+    if (historyHandle) { historyHandle.destroy(); historyHandle = null; }
+    const real = loadSessions();
+    const sessions = sample === true ? Scout.modules.history.sample(42) : real;
+    const host = el('div', { class: 'ms-historyhost' });
+    show(el('main', { class: 'screen' }, [
+      el('header', { class: 'spread' }, [el('h1', { class: 'h-display', text: sample === true ? 'History · sample data' : 'History' }), el('button', { class: 'btn btn-quiet', type: 'button', text: '← Back', onclick: () => { if (historyHandle) { historyHandle.destroy(); historyHandle = null; } home(); } })]),
+      sample === true
+        ? el('p', { class: 'ms-samplenote', text: 'These are made-up sessions showing what six weeks of training looks like. None of it is yours.' })
+        : (!real.some(s => s.pvt) && el('div', { class: 'card spread' }, [el('span', { class: 'muted', text: 'No sessions yet. Your charts appear after your first morning.' }), el('button', { class: 'btn', type: 'button', text: 'Preview with sample data', onclick: () => historyScreen(true) })])),
+      host
+    ]));
+    historyHandle = Scout.modules.history.mount(host, sessions, {
+      onClearAll: () => { if (sample === true) return historyScreen(); store.clearAll(); historyScreen(); }
+    });
+  }
+
+  /* ---------- about ---------- */
+  function about() {
+    const part = (name, what, how, payoff) => el('article', { class: 'ms-aboutrow ms-in' }, [
+      el('h2', { class: 'ms-specname', text: name }),
+      el('div', { class: 'ms-aboutcol' }, [el('div', { class: 'label', text: 'What it is' }), el('p', { text: what }), el('p', { class: 'muted', text: how })]),
+      el('div', { class: 'ms-aboutcol' }, [el('div', { class: 'label', text: 'The payoff with routine' }), el('p', { text: payoff })])
+    ]);
+    const phase = (when, title, text) => el('div', { class: 'ms-phase' }, [
+      el('div', { class: 'num ms-phasewhen', text: when }), el('div', { class: 'ms-phasetitle', text: title }), el('p', { class: 'muted', text })
+    ]);
+    show(el('main', { class: 'screen ms-about' }, [
+      el('header', { class: 'spread' }, [el('h1', { class: 'h-display', text: 'About' }), el('button', { class: 'btn btn-quiet', type: 'button', text: '← Back', onclick: home })]),
+      el('p', { class: 'ms-lede prose', text: 'A grip-strength test for the mind. One fixed measure tells you how ready your brain is this morning; two short training blocks rebuild skills that modern life lets fade: wide peripheral awareness and an internal sense of direction.' }),
+
+      el('section', { class: 'ms-aboutlist' }, [
+        part('Reaction check',
+          'A three-minute vigilance test. Numbers appear at random moments and you tap the instant you see them.',
+          'It’s the most sleep-sensitive measure in the field and almost immune to practice, so it never gets trained. Lapses, the responses slower than 355 ms, are the key number: they rise with sleep debt before you feel it. The boredom is the test; holding focus through it is what’s being measured.',
+          'After ten sessions you have a personal baseline, and each morning is compared to your own normal rather than to anyone else. Over weeks you learn what actually moves your numbers: short sleep, a late drink, a heavy day. It’s an objective second opinion on how you feel, and it sets how hard today’s training pushes.'),
+        part('Wide Field',
+          'A scene flashes for a fraction of a second while your eyes stay on the centre. You name the central symbol and locate the diamond at the edge.',
+          'This is useful-field-of-view training: how much you can take in at a single glance, and how fast. The flash shortens each time you succeed and lengthens when you miss, keeping you at your limit.',
+          'Your threshold, the shortest flash you can still read, falls as the visual system learns to take in more of a scene before conscious looking starts. In a large long-term trial in older adults, this kind of training produced effects that lasted years and was linked to fewer at-fault car crashes. Outdoors it means noticing movement at the edges sooner, without turning your head.'),
+        part('Dead Reckoning',
+          'A walker follows a route you can only partly see. At the end, you point back to the start and say how far it is.',
+          'The technique it teaches is how navigators and animals do it: keep one running arrow pointing home and update it after every leg, instead of remembering the route. Six levels move from a map view to turning with the world and judging distance from pace and time.',
+          'A sense of direction that works without a screen. Heavy satnav use is linked to weaker spatial memory, while finding your own way exercises the brain’s navigation system. The Field drills carry it outside, where your legs and inner ear add real turns and distances.')
+      ]),
+
+      el('section', { class: 'ms-phases' }, [
+        el('div', { class: 'label', text: 'What to expect, by session' }),
+        el('div', { class: 'ms-phasegrid' }, [
+          phase('S01–S10', 'Calibration', 'You’re learning the tasks, so numbers improve quickly, mostly from familiarity. The reaction check is building your baseline; no colours yet.'),
+          phase('S11–S30', 'Real gains', 'Readiness colours begin. Wide Field thresholds fall steadily and Dead Reckoning climbs levels. Most of the visible improvement happens here.'),
+          phase('S30 +', 'Maintenance', 'Gains slow and plateau, which is normal. The routine now keeps the skills sharp, and your readiness history becomes a useful record of what affects you.')
+        ])
+      ]),
+
+      el('section', { class: 'ms-limits' }, [
+        el('div', { class: 'label', text: 'Honest limits' }),
+        el('ul', {}, [
+          el('li', { text: 'Training improves the trained skills and close relatives of them. It won’t raise general intelligence; no brain training reliably does.' }),
+          el('li', { text: 'This isn’t a medical test. A run of red mornings is worth paying attention to, but it isn’t a diagnosis.' }),
+          el('li', { text: 'Readings are only comparable if conditions are: same tablet, same time after waking, same caffeine routine.' })
+        ])
+      ])
+    ]));
+  }
+
+  /* ---------- field drills ---------- */
+  function drills() {
+    const drill = (title, time, steps, why) => el('article', { class: 'card ms-drill' }, [
+      el('div', { class: 'spread' }, [el('h2', { class: 'h-2', text: title }), el('span', { class: 'label', text: time })]),
+      el('ol', { class: 'ms-steps' }, steps.map(s => el('li', { text: s }))),
+      el('p', { class: 'muted ms-small', text: why })
+    ]);
+    show(el('main', { class: 'screen' }, [
+      el('header', { class: 'spread' }, [el('h1', { class: 'h-display', text: 'Field drills' }), el('button', { class: 'btn btn-quiet', type: 'button', text: '← Back', onclick: home })]),
+      el('p', { class: 'prose muted', text: 'The screen trains the core. These carry it into real space, where your body’s own motion sense joins in.' }),
+      el('div', { class: 'ms-drills' }, [
+        drill('Wide-angle gaze', '1–2 min', [
+          'Pick a point straight ahead at eye level, a little above the horizon.',
+          'Without moving your eyes, widen your attention until you can feel both hands held out to your sides, wiggling their fingers.',
+          'Hold that soft, wide focus and walk slowly. Notice anything that moves at the edges before you look at it.'
+        ], 'Trackers call this splatter vision. Motion detection is strongest in the periphery, so this is the mode for spotting animals or changes in a landscape.'),
+        drill('Point home', 'any walk', [
+          'At the start of a walk, note your direction using a landmark or the sun.',
+          'Every few turns, stop and point to where you started. Say the bearing as a clock face: “home is at 7 o’clock.”',
+          'Check with your phone’s compass or map, then walk on and update your home arrow.'
+        ], 'This is the same skill as the Dead Reckoning block, with your inner ear and legs supplying the turns and distances.'),
+        drill('Pace count', '5 min, once', [
+          'Measure 100 metres on a path, or use a running track.',
+          'Walk it at a normal pace, counting each time your left foot lands.',
+          'Repeat twice and average. That number is your pace count for 100 m on flat ground. Expect more paces uphill and on rough ground.'
+        ], 'Soldiers and navigators use pace counts to estimate distance without instruments. It sharpens the distance half of dead reckoning.'),
+        drill('Silent count', '1 min', [
+          'Stand somewhere with activity: a park, a street, a garden.',
+          'In one glance of about a second, take in the scene, then look away.',
+          'Say how many people, birds or vehicles were there. Look back to check.'
+        ], 'Quick estimation of numbers at a glance pairs with the Wide Field training: taking in a whole scene before deliberate looking kicks in.')
+      ])
+    ]));
+  }
+
+  /* ---------- settings ---------- */
+  function settings() {
+    const prefs = loadPrefs();
+    const t = loadTrain();
+    const confirmBox = el('div', { class: 'card ms-confirm', hidden: true }, [
+      el('p', { text: 'This deletes every session and your training levels on this tablet. It can’t be undone.' }),
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: () => { confirmBox.hidden = true; } }),
+        el('button', { class: 'btn btn-danger', type: 'button', text: 'Delete everything', onclick: () => { store.clearAll(); home(); } })
+      ])
+    ]);
+    const resetBox = el('div', { class: 'card ms-confirm', hidden: true }, [
+      el('p', { text: 'Training levels go back to the start: Wide Field stage 1 at 250 ms, Dead Reckoning level 1. Your session history stays.' }),
+      el('div', { class: 'row' }, [
+        el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: () => { resetBox.hidden = true; } }),
+        el('button', { class: 'btn btn-danger', type: 'button', text: 'Reset levels', onclick: () => { store.set('train', {}); settings(); } })
+      ])
+    ]);
+    show(el('main', { class: 'screen ms-settings' }, [
+      el('header', { class: 'spread' }, [el('h1', { class: 'h-display', text: 'Settings' }), el('button', { class: 'btn btn-quiet', type: 'button', text: '← Back', onclick: home })]),
+      el('section', { class: 'card ms-setrows' }, [
+        el('div', { class: 'spread' }, [el('div', {}, [el('strong', { text: 'Wide Field training' }), el('div', { class: 'muted ms-small', text: `Stage ${t.wfStage} · flash ${Math.round(t.wfExposureMs)} ms` })]),
+          seg('ms-pref-wf', [[true, 'On'], [false, 'Off']], prefs.widefield, v => { prefs.widefield = v; savePrefs(prefs); })]),
+        el('div', { class: 'spread' }, [el('div', {}, [el('strong', { text: 'Dead Reckoning training' }), el('div', { class: 'muted ms-small', text: `Level ${t.drLevel} · ${DR_LEVELS[t.drLevel - 1]}` })]),
+          seg('ms-pref-dr', [[true, 'On'], [false, 'Off']], prefs.deadreck, v => { prefs.deadreck = v; savePrefs(prefs); })])
+      ]),
+      el('section', { class: 'card ms-setrows' }, [
+        el('div', { class: 'spread' }, [el('div', {}, [el('strong', { text: 'Reset training levels' }), el('div', { class: 'muted ms-small', text: 'Keeps your history.' })]),
+          el('button', { class: 'btn', type: 'button', text: 'Reset levels', onclick: () => { resetBox.hidden = false; } })]),
+        resetBox,
+        el('div', { class: 'spread' }, [el('div', {}, [el('strong', { text: 'Clear all data' }), el('div', { class: 'muted ms-small', text: 'Sessions, baseline and levels. Stored only on this tablet.' })]),
+          el('button', { class: 'btn', type: 'button', text: 'Clear all data', onclick: () => { confirmBox.hidden = false; } })]),
+        confirmBox
+      ]),
+      el('section', { class: 'prose muted ms-small' }, [
+        el('p', { text: 'For clean readings: same device, same time after waking (30–60 minutes in is ideal), same position, and the same caffeine routine each day.' }),
+        el('p', { text: 'Data stays in this browser on this tablet. Clearing site data or using a private window removes it.' })
+      ])
+    ]));
+  }
+
+  Scout.app = { computeReadiness, home };
+  home();
+})();
+
+</script>
+</body>
+</html>
