@@ -672,7 +672,7 @@ window.Scout = (function () {
     todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   };
 
-  return { store, stats, util, modules: {}, version: 1, appVersion: '1.1.0' };
+  return { store, stats, util, modules: {}, version: 1, appVersion: '1.2.0' };
 })();
 
 ;
@@ -1640,7 +1640,7 @@ window.Scout = (function () {
           el('div', { class: 'label', text: 'Level ' + level + ' · ' + cfg.name }),
           el('h1', { class: 'h-display', text: 'Dead Reckoning' }),
           el('p', { class: 'prose', text: 'Watch the walker as it walks a route, one leg at a time. The start marker disappears after the first steps, so keep track of where home is as you go.' + (cfg.ego ? ' The view turns with the walker: ahead is always up.' : '') }),
-          el('p', { class: 'prose', text: 'At the end, drag from the walker back toward the start. The direction is your aim; the length of the line is how far.' }),
+          el('p', { class: 'prose', text: 'At the end, aim back at the start. Drag anywhere on the screen to move the aim point, like a trackpad: its direction from the walker is your bearing home, its distance is how far. Move slowly for fine adjustments.' }),
           btn]));
         btn.focus();
         return clicked(btn);
@@ -1675,23 +1675,50 @@ window.Scout = (function () {
         if ((await wait(walked)) === ABORT) return ABORT;
 
         /* answer */
-        scene.mode = 'answer'; scene.guess = null;
-        hint.textContent = 'Drag from the walker toward the start'; hint.hidden = false;
+        scene.mode = 'answer';
+        /* Trackpad-style aiming: the aim point starts on the walker and moves relative to the finger,
+           so the finger never covers it. Slow movement is geared down for precision, fast movement travels.
+           The last 100 ms before lift-off are discarded so lifting the finger can't nudge the aim. */
+        const home0 = scene.walkerScreen || { x: view.w / 2, y: view.h / 2 };
+        scene.guess = { x: home0.x, y: home0.y };
+        hint.textContent = 'Drag anywhere to move the aim. Lift and drag again to fine-tune.'; hint.hidden = false;
         lockBtn.hidden = false; lockBtn.disabled = true;
-        let dragging = false;
-        const setGuess = e => {
-          const r = canvas.getBoundingClientRect();
-          scene.guess = { x: U.clamp(e.clientX - r.left, 0, view.w), y: U.clamp(e.clientY - r.top, 0, view.h) };
-          lockBtn.disabled = false;
+        const LIFT_MS = 100, GAIN_MIN = 0.35, GAIN_MAX = 1.0, FAST = 1.2; /* px per ms where gain reaches max */
+        let drag = null;
+        const publish = () => {
+          root.dataset.aim = Math.round(scene.guess.x * 10) / 10 + ',' + Math.round(scene.guess.y * 10) / 10;
+          lockBtn.disabled = Math.hypot(scene.guess.x - home0.x, scene.guess.y - home0.y) < 6;
         };
-        const pd = e => { dragging = true; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} setGuess(e); };
-        const pm = e => { if (dragging) setGuess(e); };
-        const pu = () => { dragging = false; };
+        publish();
+        const pd = e => {
+          if (drag) return;
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+          drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: e.timeStamp, trail: [{ t: e.timeStamp, x: scene.guess.x, y: scene.guess.y }] };
+        };
+        const pm = e => {
+          if (!drag || e.pointerId !== drag.id) return;
+          const dx = e.clientX - drag.x, dy = e.clientY - drag.y, dt = Math.max(1, e.timeStamp - drag.t);
+          const speed = Math.hypot(dx, dy) / dt;
+          const gain = GAIN_MIN + (GAIN_MAX - GAIN_MIN) * U.clamp(speed / FAST, 0, 1);
+          scene.guess = { x: U.clamp(scene.guess.x + dx * gain, 0, view.w), y: U.clamp(scene.guess.y + dy * gain, 0, view.h) };
+          drag.x = e.clientX; drag.y = e.clientY; drag.t = e.timeStamp;
+          drag.trail.push({ t: e.timeStamp, x: scene.guess.x, y: scene.guess.y });
+          publish();
+        };
+        const pu = e => {
+          if (!drag || (e && e.pointerId !== drag.id)) return;
+          const tUp = e ? e.timeStamp : performance.now();
+          let keep = drag.trail[0];
+          for (const p of drag.trail) { if (p.t <= tUp - LIFT_MS) keep = p; else break; }
+          scene.guess = { x: keep.x, y: keep.y };
+          drag = null; publish();
+        };
         canvas.addEventListener('pointerdown', pd); canvas.addEventListener('pointermove', pm);
         canvas.addEventListener('pointerup', pu); canvas.addEventListener('pointercancel', pu);
         const r = await clicked(lockBtn);
         canvas.removeEventListener('pointerdown', pd); canvas.removeEventListener('pointermove', pm);
         canvas.removeEventListener('pointerup', pu); canvas.removeEventListener('pointercancel', pu);
+        delete root.dataset.aim;
         hint.hidden = true; lockBtn.hidden = true;
         if (r === ABORT) return ABORT;
 
