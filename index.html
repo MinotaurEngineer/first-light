@@ -82,6 +82,7 @@ body {
   touch-action: none; user-select: none; -webkit-user-select: none; z-index: 20;
   --bg: #000000; --surface: #0E0E0E; --surface-2: #1A1A19; --ink: #FFFFFF; --muted: #7C7C78; --line: #2A2A28;
   --accent: #FFFFFF; --accent-ink: #000000; --signal: #E3B25A; --good: #4CAE76; --warn: #DDB04A; --bad: #E0614D;
+  --ground: #6A6A65; /* v1.2.1: Dead Reckoning ground texture, bright enough to read motion and turns */
   color-scheme: dark;
 }
 .stage canvas { display: block; width: 100%; height: 100%; }
@@ -264,8 +265,9 @@ body {
   border: 1px solid var(--line); background: var(--surface); color: var(--ink);
 }
 
+/* v1.2.1: hint sits below the compass, which now lives at top centre */
 .dr-hint {
-  position: absolute; top: 72px; left: 50%; transform: translateX(-50%);
+  position: absolute; top: 168px; left: 50%; transform: translateX(-50%);
   font-family: var(--font-body); color: var(--muted); background: var(--surface);
   border: 1px solid var(--line); border-radius: 999px; padding: 6px 16px; pointer-events: none; white-space: nowrap;
 }
@@ -672,7 +674,7 @@ window.Scout = (function () {
     todayISO() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   };
 
-  return { store, stats, util, modules: {}, version: 1, appVersion: '1.2.0' };
+  return { store, stats, util, modules: {}, version: 1, appVersion: '1.2.1' };
 })();
 
 ;
@@ -1269,7 +1271,10 @@ window.Scout = (function () {
 })();
 
 ;
-/* First Light — Dead Reckoning (path integration) training module. */
+/* First Light — Dead Reckoning (path integration) training module.
+   v1.2.1: every level uses a camera that follows the walker (north-up for levels 1–3, heading-up from 4),
+   so the start can't be held as a fixed spot on the screen. The ground texture is bright enough to show
+   motion and turns, the last leg lingers through each turn, and the compass sits at top centre. */
 (function () {
   'use strict';
   const D2R = Math.PI / 180, R2D = 180 / Math.PI;
@@ -1287,10 +1292,10 @@ window.Scout = (function () {
     6: { name: 'Long walk', legs: [5, 6], turns: null, ego: true, speedVary: false, fade: false }
   };
   const CARDS = {
-    1: ['One home arrow', 'Picture a single arrow from the walker back to the start. That arrow is the only thing worth carrying.', 'Grow it as the walker moves; you do not need to remember the legs themselves.'],
-    2: ['Update, then forget', 'At every turn, fold the leg you just walked into the home arrow.', 'Then let that leg go — the arrow already holds it. The trail will vanish to help you practise this.'],
+    1: ['One home arrow', 'Picture a single arrow from the walker back to the start. That arrow is the only thing worth carrying.', 'The view follows the walker with north up, so home slides across the screen. Grow the arrow as the walker moves; you do not need to remember the legs themselves.'],
+    2: ['Update, then forget', 'At every turn, fold the leg you just walked into the home arrow.', 'Then let that leg go — the arrow already holds it. Each leg lingers briefly through the turn, then vanishes to help you practise this.'],
     3: ['Clock-face bearings', 'Name home as a clock hour: “home is at 7 o’clock.”', 'After each turn, shift the hour by the turn: 90° is 3 hours, 45° is 1½, 135° is 4½.'],
-    4: ['Turn with the world', 'Now ahead is always up, and the world turns around the walker.', 'When the walker turns right, home swings left by the same amount. Pin the arrow to the ground, not to the screen.'],
+    4: ['Turn with the world', 'Now ahead is always up, and the world turns around the walker. Read each turn from the ground dots swinging, the last leg sweeping away, and the compass at the top.', 'When the walker turns right, home swings left by the same amount. Pin the arrow to the ground, not to the screen.'],
     5: ['Pace × time', 'The pace changes from leg to leg. Watch the footprint spacing and feel the duration.', 'A short, fast leg can cover as much ground as a long, slow one: distance = pace × time.'],
     6: ['Trust the arrow', 'Too many legs to remember — and you don’t need to.', 'Update the arrow at each turn, forget the leg, and commit to the arrow at the end.']
   };
@@ -1401,12 +1406,16 @@ window.Scout = (function () {
   const WALK_SPEED = 1.2;   // world units / s at speed 1
   const STEP_HZ = 2.2;      // steps / s (constant, so stride ∝ speed)
   const TURN_MS = 420;
+  const TURN_GAP_MS = 140;  // pause after a turn before walking on
+  const LINGER_MS = 1500;   // previous leg fades over this long once the turn is done
+  const FADE_L1_MS = 3000;  // level 1 keeps all earlier legs, fading more slowly
+  const VIEW_VERSION = 2;   // stored on results: 2 = following camera, visible ground (v1.2.1)
 
   function buildTimeline(route) {
     const segs = []; let t = 900;
     route.legs.forEach((l, i) => {
       const hPrev = i === 0 ? route.h0 : route.legs[i - 1].heading;
-      if (i > 0) { segs.push({ type: 'turn', t0: t, dur: TURN_MS, h0: hPrev, h1: l.heading, leg: i }); t += TURN_MS + 140; }
+      if (i > 0) { segs.push({ type: 'turn', t0: t, dur: TURN_MS, h0: hPrev, h1: l.heading, leg: i }); t += TURN_MS + TURN_GAP_MS; }
       const dur = l.len / (WALK_SPEED * l.speed) * 1000;
       segs.push({ type: 'walk', t0: t, dur, leg: i, from: route.points[i], to: route.points[i + 1], heading: l.heading, speed: l.speed });
       t += dur;
@@ -1426,6 +1435,11 @@ window.Scout = (function () {
       }
     }
     return st;
+  }
+  /* Opacity of an earlier leg's trail: full through the turn, then fading. */
+  function legTrailAlpha(sinceLegEnd, fadeMs) {
+    const hold = TURN_MS + TURN_GAP_MS;
+    return sinceLegEnd < hold ? 1 : Math.max(0, 1 - (sinceLegEnd - hold) / fadeMs);
   }
 
   function run(container, options) {
@@ -1466,7 +1480,7 @@ window.Scout = (function () {
       container.appendChild(root);
 
       let view = { ctx: null, w: 0, h: 0 };
-      const readPal = () => { ['--line', '--muted', '--accent', '--signal', '--good', '--ink', '--surface', '--stage-bg'].forEach(k => { pal[k] = U.cssVar(k); }); };
+      const readPal = () => { ['--line', '--ground', '--muted', '--accent', '--signal', '--good', '--ink', '--surface', '--stage-bg'].forEach(k => { pal[k] = U.cssVar(k); }); };
       const refit = () => { view = U.fitCanvas(canvas); readPal(); };
       const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
       window.addEventListener('resize', refit);
@@ -1478,35 +1492,29 @@ window.Scout = (function () {
 
       /* ---- rendering state ---- */
       let scene = { mode: 'idle' };
-      const HUD_TOP = 64, BOTTOM = 100;
+      const HUD_TOP = 64;
 
+      /* Every level follows the walker. Levels 1–3 keep north up; from level 4 the view turns with the walker. */
       function camFor(route, st) {
         const { w, h } = view, cfg = LEVELS[route.level];
-        if (cfg.ego) {
-          const s = (Math.min(w, h) / 2 - 80) / 7;
-          return { x: st.pos.x, y: st.pos.y, rot: st.heading, s: Math.max(18, s), cx: w / 2, cy: h / 2 };
-        }
-        return Object.assign({ rot: 0 }, route.fixedCam);
-      }
-      function fixedCamera(points) {
-        const { w, h } = view, uh = h - HUD_TOP - BOTTOM, s = Math.min(w, uh) / 9;
-        const xs = points.map(p => p.x), ys = points.map(p => p.y);
-        return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, s, cx: w / 2, cy: HUD_TOP + uh / 2 };
+        const s = Math.max(18, (Math.min(w, h) / 2 - 80) / 7);
+        return { x: st.pos.x, y: st.pos.y, rot: cfg.ego ? st.heading : 0, s, cx: w / 2, cy: h / 2 };
       }
 
       function hash(i, j) { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); }
-      function drawGround(ctx, cam) {
-        const sp = 0.5, R = Math.hypot(view.w, view.h) / 2 / cam.s + 1;
+      function drawGround(ctx, cam, alpha) {
+        const sp = 0.5, R = Math.hypot(view.w, view.h) / 2 / cam.s + 1, rad = 2.1;
         const c = toWorld(cam, { x: view.w / 2, y: view.h / 2 });
-        ctx.fillStyle = pal['--line']; ctx.beginPath();
+        ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha;
+        ctx.fillStyle = pal['--ground'] || pal['--muted']; ctx.beginPath();
         for (let i = Math.floor((c.x - R) / sp); i <= Math.ceil((c.x + R) / sp); i++) {
           for (let j = Math.floor((c.y - R) / sp); j <= Math.ceil((c.y + R) / sp); j++) {
             const q = toScreen(cam, { x: (i + 0.15 + 0.7 * hash(i, j)) * sp, y: (j + 0.15 + 0.7 * hash(j, i + 7)) * sp });
             if (q.x < -4 || q.y < -4 || q.x > view.w + 4 || q.y > view.h + 4) continue;
-            ctx.moveTo(q.x + 1.7, q.y); ctx.arc(q.x, q.y, 1.7, 0, Math.PI * 2);
+            ctx.moveTo(q.x + rad, q.y); ctx.arc(q.x, q.y, rad, 0, Math.PI * 2);
           }
         }
-        ctx.fill();
+        ctx.fill(); ctx.restore();
       }
       function drawHouse(ctx, q, size, alpha) {
         ctx.save(); ctx.globalAlpha = alpha; ctx.translate(q.x, q.y);
@@ -1527,28 +1535,35 @@ window.Scout = (function () {
         if (alpha <= 0 || frac <= 0) return;
         const a = route.points[legIdx], b = route.points[legIdx + 1], l = route.legs[legIdx];
         const len = l.len * frac, ux = (b.x - a.x) / l.len, uy = (b.y - a.y) / l.len;
-        ctx.save(); ctx.globalAlpha = alpha * 0.35; ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2;
+        ctx.save(); ctx.globalAlpha = alpha * 0.5; ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2;
         const qa = toScreen(cam, a), qb = toScreen(cam, { x: a.x + ux * len, y: a.y + uy * len });
         ctx.beginPath(); ctx.moveTo(qa.x, qa.y); ctx.lineTo(qb.x, qb.y); ctx.stroke();
-        ctx.globalAlpha = alpha * 0.7; ctx.fillStyle = pal['--muted'];
+        ctx.globalAlpha = alpha * 0.8; ctx.fillStyle = pal['--ink'];
         const stride = WALK_SPEED * l.speed / STEP_HZ, off = 0.07;
         let k = 0;
         for (let d = stride / 2; d <= len; d += stride, k++) {
           const side = k % 2 ? 1 : -1;
           const q = toScreen(cam, { x: a.x + ux * d + uy * off * side, y: a.y + uy * d - ux * off * side });
-          ctx.beginPath(); ctx.arc(q.x, q.y, 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(q.x, q.y, 2.8, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
       }
+      /* Compass at top centre, where the eyes already are. The needle points to north on the ground. */
       function drawCompass(ctx, rot) {
-        const cx = 54 + 10, cy = view.h - 64, r = 30;
+        const cx = view.w / 2, cy = HUD_TOP + 52, r = 34;
         ctx.save(); ctx.translate(cx, cy);
-        ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = pal['--stage-bg']; ctx.globalAlpha = 0.85;
+        ctx.beginPath(); ctx.arc(0, 0, r + 4, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+        /* fixed tick at the top of the ring = the direction the screen faces */
+        ctx.strokeStyle = pal['--ink']; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.moveTo(0, -r - 1); ctx.lineTo(0, -r + 7); ctx.stroke();
         ctx.rotate(-rot * D2R);
-        ctx.fillStyle = pal['--ink']; ctx.beginPath(); ctx.moveTo(0, -r + 2); ctx.lineTo(6, -6); ctx.lineTo(-6, -6); ctx.closePath(); ctx.fill();
-        ctx.fillStyle = pal['--muted']; ctx.beginPath(); ctx.moveTo(0, r - 2); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
-        ctx.translate(0, -r - 12); ctx.rotate(rot * D2R);
-        ctx.fillStyle = pal['--ink']; ctx.font = '600 13px ' + U.cssVar('--font-mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillStyle = pal['--signal']; ctx.beginPath(); ctx.moveTo(0, -r + 4); ctx.lineTo(8, -4); ctx.lineTo(-8, -4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal['--muted']; ctx.beginPath(); ctx.moveTo(0, r - 4); ctx.lineTo(7, 4); ctx.lineTo(-7, 4); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = pal['--ink']; ctx.beginPath(); ctx.arc(0, 0, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.translate(0, -r - 14); ctx.rotate(rot * D2R);
+        ctx.fillStyle = pal['--signal']; ctx.font = '600 14px ' + U.cssVar('--font-mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText('N', 0, 0); ctx.restore();
       }
       function drawGuess(ctx, from, to) {
@@ -1566,7 +1581,7 @@ window.Scout = (function () {
         ctx.clearRect(0, 0, w, h);
         if (sessionT0 != null) timeFill.style.transform = 'scaleX(' + Math.max(0, 1 - (now - sessionT0) / durationMs) + ')';
         const sc = scene;
-        if (sc.mode === 'idle') { drawGround(ctx, { x: 0, y: 0, rot: 0, s: Math.min(w, h) / 9, cx: w / 2, cy: h / 2 }); return; }
+        if (sc.mode === 'idle') { drawGround(ctx, { x: 0, y: 0, rot: 0, s: Math.max(18, (Math.min(w, h) / 2 - 80) / 7), cx: w / 2, cy: h / 2 }, 0.6); return; }
         const route = sc.route, cfg = LEVELS[route.level];
         if (sc.mode === 'walk' || sc.mode === 'answer') {
           const t = sc.mode === 'walk' ? now - sc.t0 : sc.tl.end;
@@ -1575,7 +1590,8 @@ window.Scout = (function () {
           const cam = camFor(route, st); sc.cam = cam;
           drawGround(ctx, cam);
           if (sc.mode === 'walk') {
-            if (cfg.fade) for (let i = 0; i < st.leg; i++) drawLegTrail(ctx, cam, route, i, 1, 1 - (t - sc.tl.legEnd[i]) / 2000);
+            if (cfg.fade) { for (let i = 0; i < st.leg; i++) drawLegTrail(ctx, cam, route, i, 1, legTrailAlpha(t - sc.tl.legEnd[i], FADE_L1_MS)); }
+            else if (st.leg > 0) { const i = st.leg - 1; drawLegTrail(ctx, cam, route, i, 1, legTrailAlpha(t - sc.tl.legEnd[i], LINGER_MS)); }
             drawLegTrail(ctx, cam, route, st.leg, st.frac, 1);
             const leg0End = sc.tl.legEnd[0], leg0Start = sc.tl.segs[0].t0;
             const hA = t < leg0Start ? 1 : Math.max(0, 1 - (t - leg0Start) / (leg0End - leg0Start));
@@ -1584,7 +1600,7 @@ window.Scout = (function () {
           const q = toScreen(cam, st.pos);
           const bob = st.walking ? Math.abs(Math.sin((st.tw / 1000) * STEP_HZ * Math.PI)) : 0;
           drawWalker(ctx, q, st.heading - cam.rot, 1 + bob * 0.1);
-          if (cfg.ego) drawCompass(ctx, cam.rot);
+          drawCompass(ctx, cam.rot);
           if (sc.mode === 'answer' && sc.guess) drawGuess(ctx, q, sc.guess);
           sc.walkerScreen = q;
           if (sc.mode === 'walk' && t >= sc.tl.end && sc.done) { const d = sc.done; sc.done = null; d(); }
@@ -1594,7 +1610,7 @@ window.Scout = (function () {
       }
 
       function drawFeedback(ctx, sc) {
-        const { w, h } = view, route = sc.route, pts = route.points, end = pts[pts.length - 1];
+        const { w, h } = view, route = sc.route, pts = route.points;
         const all = pts.concat([sc.guessWorld]);
         const landscape = w >= h;
         const box = landscape ? { x0: 24, y0: HUD_TOP, x1: w - Math.min(400, w * 0.42), y1: h - 24 } : { x0: 24, y0: HUD_TOP, x1: w - 24, y1: h - 300 };
@@ -1602,7 +1618,7 @@ window.Scout = (function () {
         const bw = Math.max(1, Math.max(...xs) - Math.min(...xs)), bh = Math.max(1, Math.max(...ys) - Math.min(...ys));
         const s = Math.min((box.x1 - box.x0 - 80) / bw, (box.y1 - box.y0 - 80) / bh, 120);
         const cam = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2, rot: 0, s, cx: (box.x0 + box.x1) / 2, cy: (box.y0 + box.y1) / 2 };
-        drawGround(ctx, cam);
+        drawGround(ctx, cam, 0.45);
         const P = pts.map(p => toScreen(cam, p));
         ctx.save(); ctx.strokeStyle = pal['--muted']; ctx.lineWidth = 2.5; ctx.lineJoin = 'round';
         ctx.beginPath(); P.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.stroke();
@@ -1639,7 +1655,8 @@ window.Scout = (function () {
         showOverlay(el('div', { class: 'card dr-panel' }, [
           el('div', { class: 'label', text: 'Level ' + level + ' · ' + cfg.name }),
           el('h1', { class: 'h-display', text: 'Dead Reckoning' }),
-          el('p', { class: 'prose', text: 'Watch the walker as it walks a route, one leg at a time. The start marker disappears after the first steps, so keep track of where home is as you go.' + (cfg.ego ? ' The view turns with the walker: ahead is always up.' : '') }),
+          el('p', { class: 'prose', text: 'Watch the walker as it walks a route, one leg at a time. The view follows the walker and the start marker disappears after the first steps, so keep track of where home is as you go.' +
+            (cfg.ego ? ' The view also turns with the walker: ahead is always up. Read each turn from the ground swinging around and the compass at the top.' : ' North stays up, as the compass at the top shows.') }),
           el('p', { class: 'prose', text: 'At the end, aim back at the start. Drag anywhere on the screen to move the aim point, like a trackpad: its direction from the walker is your bearing home, its distance is how far. Move slowly for fine adjustments.' }),
           btn]));
         btn.focus();
@@ -1663,13 +1680,8 @@ window.Scout = (function () {
       async function doRep() {
         const cfg = LEVELS[level];
         readPal();
-        let route;
-        if (cfg.ego) route = genRoute(level, { maxHome: 6.3 });
-        else {
-          const uh = view.h - HUD_TOP - BOTTOM, s = Math.min(view.w, uh) / 9;
-          route = genRoute(level, { w: view.w / s, h: uh / s });
-          route.fixedCam = fixedCamera(route.points);
-        }
+        /* The following camera keeps the walker centred, so home only has to fit within the screen radius. */
+        const route = genRoute(level, { maxHome: 6.3 });
         const tl = buildTimeline(route);
         const walked = new Promise(r => { scene = { mode: 'walk', route, tl, t0: performance.now(), done: r }; });
         if ((await wait(walked)) === ABORT) return ABORT;
@@ -1775,7 +1787,7 @@ window.Scout = (function () {
         if (signal) signal.removeEventListener('abort', onAbort);
         root.remove();
         const errs = reps.map(r => r.angErr);
-        const res = { reps, n: reps.length, meanAngErr: errs.length ? St.mean(errs) : null, medianAngErr: errs.length ? St.median(errs) : null, startLevel, level, seenCards: [...seen].sort((a, b) => a - b) };
+        const res = { reps, n: reps.length, meanAngErr: errs.length ? St.mean(errs) : null, medianAngErr: errs.length ? St.median(errs) : null, startLevel, level, seenCards: [...seen].sort((a, b) => a - b), view: VIEW_VERSION };
         if (aborted) res.aborted = true;
         resolve(res);
       }
@@ -1798,7 +1810,7 @@ window.Scout = (function () {
   }
 
   const root = typeof window !== 'undefined' ? window : globalThis;
-  if (root.Scout && root.Scout.modules) root.Scout.modules.deadreck = { run, _geo: geo };
+  if (root.Scout && root.Scout.modules) root.Scout.modules.deadreck = { run, _geo: geo, VIEW_VERSION };
   if (typeof module !== 'undefined' && module.exports) module.exports = geo;
 })();
 
@@ -2119,8 +2131,11 @@ window.Scout = (function () {
         ['Latest mean error', String(Math.round(last.meanAngErr)), '°'],
         ['Best mean error', String(Math.round(Math.min(...rows.map(s => s.deadreck.meanAngErr)))), '°']
       ]));
+      /* v1.2.1: mark where the following-camera view began; scores before it aren't comparable. */
+      const markers = [];
+      rows.forEach((s, i) => { if (i && s.deadreck.view === 2 && rows[i - 1].deadreck.view !== 2) markers.push({ x: dayNum(s.date), label: 'New view' }); });
       addChart(body, 'Pointing error', 'mean degrees off home · lower is better', 220, () => ({
-        kind: 'line', yZero: true, aria: 'Dead Reckoning mean angle error per session',
+        kind: 'line', yZero: true, markers, aria: 'Dead Reckoning mean angle error per session',
         points: rows.map(s => ({ x: dayNum(s.date), y: s.deadreck.meanAngErr }))
       }), v => v + '°');
       addChart(body, 'Level', 'level at end of session · higher is harder', 120, () => ({
@@ -2321,7 +2336,7 @@ window.Scout = (function () {
       ])
     ]), sessionStrip(sessions)]));
   }
-  const DR_LEVELS = ['Map view, square turns', 'Legs vanish', 'Angled turns', 'Turning with the world', 'Pace × time', 'Full integration'];
+  const DR_LEVELS = ['North-up view, square turns', 'Legs vanish', 'Angled turns', 'Turning with the world', 'Pace × time', 'Full integration'];
   function fmtClock(ms) { const s = Math.round(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
 
   /* Progress is read per session, not per calendar week: skipped days don't distort it. */
@@ -2561,8 +2576,8 @@ window.Scout = (function () {
           'This is useful-field-of-view training: how much you can take in at a single glance, and how fast. The flash shortens each time you succeed and lengthens when you miss, keeping you at your limit.',
           'Your threshold, the shortest flash you can still read, falls as the visual system learns to take in more of a scene before conscious looking starts. In a large long-term trial in older adults, this kind of training produced effects that lasted years and was linked to fewer at-fault car crashes. Outdoors it means noticing movement at the edges sooner, without turning your head.'),
         part('Dead Reckoning',
-          'A walker follows a route you can only partly see. At the end, you point back to the start and say how far it is.',
-          'The technique it teaches is how navigators and animals do it: keep one running arrow pointing home and update it after every leg, instead of remembering the route. Six levels move from a map view to turning with the world and judging distance from pace and time.',
+          'A walker follows a route over featureless ground while the view follows it. At the end, you point back to the start and say how far it is.',
+          'The technique it teaches is how navigators and animals do it: keep one running arrow pointing home and update it after every leg, instead of remembering the route. Six levels move from a north-up view to turning with the world and judging distance from pace and time.',
           'A sense of direction that works without a screen. Heavy satnav use is linked to weaker spatial memory, while finding your own way exercises the brain’s navigation system. The Field drills carry it outside, where your legs and inner ear add real turns and distances.')
       ]),
 
@@ -2671,7 +2686,10 @@ window.Scout = (function () {
       : util.clamp(Math.round(wf.thresholdMs), 17, 500);
   }
 
-  /* v1.1.0: rescore earlier Wide Field sessions with the corrected rules (warm-up misses ignored, floor clears the stage). */
+  /* Runs once per app version.
+     v1.1.0: rescore earlier Wide Field sessions with the corrected rules (warm-up misses ignored, floor clears the stage).
+     v1.2.1: Dead Reckoning levels 4+ were near-unplayable (invisible ground). If that dropped you back a level,
+     restore the highest level you reached, and show the updated level 4 technique card once. */
   function migrate() {
     try {
       if (store.get('migratedTo', '') === Scout.appVersion) return;
@@ -2688,8 +2706,20 @@ window.Scout = (function () {
       });
       saveSessions(all);
       if (latest && latest.n >= 8) { const t = loadTrain(); applyWideField(t, latest); saveTrain(t); }
+
+      const t = loadTrain();
+      let maxLvl = 0;
+      all.forEach(s => {
+        const d = s.deadreck;
+        if (!d || d.view === Scout.modules.deadreck.VIEW_VERSION) return;
+        maxLvl = Math.max(maxLvl, d.level || 0, d.startLevel || 0, ...(d.reps || []).map(r => r.level || 0));
+      });
+      if (maxLvl > t.drLevel) t.drLevel = Math.min(6, maxLvl);
+      if (maxLvl >= 4) t.seenCards = (t.seenCards || []).filter(l => l !== 4);
+      saveTrain(t);
+
       store.set('migratedTo', Scout.appVersion);
-    } catch (e) { /* never block the app over a rescore */ }
+    } catch (e) { /* never block the app over a migration */ }
   }
 
   Scout.app = { computeReadiness, home };
